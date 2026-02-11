@@ -1,0 +1,4 @@
+# Build output folders for this project
+/x64/
+/Win32/
+/task1/

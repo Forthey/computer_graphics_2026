@@ -1,0 +1,14 @@
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Temporary Office lock files
+~$*.ppt
+~$*.pptx
+
+# Visual Studio workspace/user state
+**/.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates

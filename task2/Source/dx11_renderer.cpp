@@ -220,7 +220,8 @@ void Dx11Renderer::shutdown() {
     if (m_device) {
         ComPtr<ID3D11Debug> debugInterface;
         if (SUCCEEDED(m_device.As(&debugInterface))) {
-            debugInterface->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL);
+            debugInterface->ReportLiveDeviceObjects(
+                static_cast<D3D11_RLDO_FLAGS>(D3D11_RLDO_DETAIL | D3D11_RLDO_IGNORE_INTERNAL));
         }
     }
 #endif

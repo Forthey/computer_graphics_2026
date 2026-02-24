@@ -8,24 +8,21 @@
 #pragma warning(pop)
 #endif
 
-class Camera {
+#include "ObjectInterfaces/Movable.h"
+#include "ObjectInterfaces/Rotatable.h"
+
+class Camera : public Rotatable, public Movable {
 public:
-    void adjustAngles(float deltaYaw, float deltaPitch);
+    void adjustAngles(float deltaDirection, float deltaTilt);
+    void rotate(float deltaDirectionRadians, float deltaTiltRadians = 0.0f) override;
     DirectX::XMMATRIX buildViewMatrix() const;
     DirectX::XMMATRIX buildProjectionMatrix(float aspectRatio) const;
     void moveLocal(float forwardDelta, float rightDelta);
+    void move(float forwardDelta, float rightDelta, float upDelta = 0.0f) override;
 
 private:
-    static constexpr float kMinPitch = -1.45f;
-    static constexpr float kMaxPitch = 1.45f;
-    static constexpr float kDefaultYaw = 0.0f;
-    static constexpr float kDefaultPitch = 0.0f;
-    static constexpr float kDefaultPositionX = 0.0f;
-    static constexpr float kDefaultPositionY = 0.0f;
-    static constexpr float kDefaultPositionZ = -3.0f;
-    static constexpr float kDefaultFovYRadians = 1.04719755f;
-    static constexpr float kDefaultNearPlane = 0.1f;
-    static constexpr float kDefaultFarPlane = 100.0f;
+    static constexpr float kMinTilt = -1.45f;
+    static constexpr float kMaxTilt = 1.45f;
     static constexpr float kAxisX0 = 0.0f;
     static constexpr float kAxisY1 = 1.0f;
     static constexpr float kAxisZ0 = 0.0f;
@@ -33,12 +30,12 @@ private:
 
     DirectX::XMVECTOR forwardVector() const;
 
-    float m_yaw = kDefaultYaw;
-    float m_pitch = kDefaultPitch;
-    float m_positionX = kDefaultPositionX;
-    float m_positionY = kDefaultPositionY;
-    float m_positionZ = kDefaultPositionZ;
-    float m_fovYRadians = kDefaultFovYRadians;
-    float m_nearPlane = kDefaultNearPlane;
-    float m_farPlane = kDefaultFarPlane;
+    float m_direction = 0.0f;
+    float m_tilt = 0.0f;
+    float m_positionX = 0.0f;
+    float m_positionY = 0.0f;
+    float m_positionZ = -3.0f;
+    float m_fovYRadians = 1.04719755f;
+    float m_nearPlane = 0.1f;
+    float m_farPlane = 100.0f;
 };

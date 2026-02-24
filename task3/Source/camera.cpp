@@ -1,12 +1,16 @@
-#include "camera.h"
+#include "Camera.h"
 
 #include <algorithm>
 #include <cmath>
 
-void Camera::adjustAngles(float deltaYaw, float deltaPitch) {
-    m_yaw += deltaYaw;
-    m_pitch += deltaPitch;
-    m_pitch = std::clamp(m_pitch, kMinPitch, kMaxPitch);
+void Camera::adjustAngles(float deltaDirection, float deltaTilt) {
+    rotate(deltaDirection, deltaTilt);
+}
+
+void Camera::rotate(float deltaDirectionRadians, float deltaTiltRadians) {
+    m_direction += deltaDirectionRadians;
+    m_tilt += deltaTiltRadians;
+    m_tilt = std::clamp(m_tilt, kMinTilt, kMaxTilt);
 }
 
 DirectX::XMMATRIX Camera::buildViewMatrix() const {
@@ -21,13 +25,18 @@ DirectX::XMMATRIX Camera::buildProjectionMatrix(float aspectRatio) const {
 }
 
 void Camera::moveLocal(float forwardDelta, float rightDelta) {
+    move(forwardDelta, rightDelta, 0.0f);
+}
+
+void Camera::move(float forwardDelta, float rightDelta, float upDelta) {
     const DirectX::XMVECTOR forward = forwardVector();
     const DirectX::XMVECTOR up = DirectX::XMVectorSet(kAxisX0, kAxisY1, kAxisZ0, kAxisW0);
     const DirectX::XMVECTOR right = DirectX::XMVector3Normalize(DirectX::XMVector3Cross(up, forward));
 
     const DirectX::XMVECTOR moveForward = DirectX::XMVectorScale(forward, forwardDelta);
     const DirectX::XMVECTOR moveRight = DirectX::XMVectorScale(right, rightDelta);
-    const DirectX::XMVECTOR move = DirectX::XMVectorAdd(moveForward, moveRight);
+    const DirectX::XMVECTOR moveUp = DirectX::XMVectorScale(up, upDelta);
+    const DirectX::XMVECTOR move = DirectX::XMVectorAdd(DirectX::XMVectorAdd(moveForward, moveRight), moveUp);
 
     DirectX::XMFLOAT3 delta{};
     DirectX::XMStoreFloat3(&delta, move);
@@ -37,6 +46,7 @@ void Camera::moveLocal(float forwardDelta, float rightDelta) {
 }
 
 DirectX::XMVECTOR Camera::forwardVector() const {
-    const float cosPitch = std::cos(m_pitch);
-    return DirectX::XMVectorSet(std::sin(m_yaw) * cosPitch, std::sin(m_pitch), std::cos(m_yaw) * cosPitch, 0.0f);
+    const float cosTilt = std::cos(m_tilt);
+    return DirectX::XMVectorSet(std::sin(m_direction) * cosTilt, std::sin(m_tilt), std::cos(m_direction) * cosTilt,
+                                0.0f);
 }

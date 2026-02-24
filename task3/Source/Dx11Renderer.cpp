@@ -1,13 +1,13 @@
-#include "dx11_renderer.h"
+#include "Dx11Renderer.h"
 
 #ifdef _MSC_VER
 #pragma warning(push, 0)
 #endif
+#include <DirectXMath.h>
 #include <d3d11.h>
 #include <d3d11sdklayers.h>
 #include <d3dcompiler.h>
 #include <dxgi.h>
-#include <DirectXMath.h>
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -16,9 +16,9 @@
 #include <cwchar>
 #include <memory>
 
-#include "cube_render_item.h"
+#include "SceneObjects/CubeRenderItem.h"
 #include "framework.h"
-#include "render_item.h"
+#include "RenderItem.h"
 
 namespace {
 constexpr std::uint32_t kSwapChainBufferCount = 2;
@@ -115,9 +115,9 @@ bool Dx11Renderer::initialize(HWND window) {
     flags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif
 
-    result =
-        D3D11CreateDevice(selectedAdapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, static_cast<unsigned int>(flags), levels, 1,
-                          D3D11_SDK_VERSION, m_device.GetAddressOf(), &featureLevel, m_context.GetAddressOf());
+    result = D3D11CreateDevice(selectedAdapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr,
+                               static_cast<unsigned int>(flags), levels, 1, D3D11_SDK_VERSION, m_device.GetAddressOf(),
+                               &featureLevel, m_context.GetAddressOf());
 
     if (FAILED(result) || featureLevel != D3D_FEATURE_LEVEL_11_0) {
         return false;
@@ -151,8 +151,8 @@ bool Dx11Renderer::initialize(HWND window) {
         return false;
     }
 
-    m_startTime = std::chrono::steady_clock::now();
-    m_hasStartTime = true;
+    m_lastFrameTime = std::chrono::steady_clock::now();
+    m_hasLastFrameTime = true;
     return true;
 }
 
@@ -165,8 +165,7 @@ void Dx11Renderer::renderFrame() {
     m_context->OMSetRenderTargets(1, targets, m_depthTarget.Get());
 
     m_context->ClearRenderTargetView(m_backBufferTarget.Get(), kClearColor);
-    m_context->ClearDepthStencilView(m_depthTarget.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, kClearDepthValue,
-                                     0);
+    m_context->ClearDepthStencilView(m_depthTarget.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, kClearDepthValue, 0);
 
     D3D11_VIEWPORT viewport{};
     viewport.TopLeftX = 0.0f;
@@ -184,11 +183,14 @@ void Dx11Renderer::renderFrame() {
     m_context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
 
     const auto now = std::chrono::steady_clock::now();
-    if (!m_hasStartTime) {
-        m_startTime = now;
-        m_hasStartTime = true;
+    std::chrono::duration<float> deltaTime = std::chrono::duration<float>::zero();
+    if (!m_hasLastFrameTime) {
+        m_lastFrameTime = now;
+        m_hasLastFrameTime = true;
+    } else {
+        deltaTime = now - m_lastFrameTime;
+        m_lastFrameTime = now;
     }
-    const float elapsedSec = std::chrono::duration<float>(now - m_startTime).count();
 
     const DirectX::XMMATRIX viewMatrix = m_camera.buildViewMatrix();
     const float aspect = (m_height != 0) ? static_cast<float>(m_width) / static_cast<float>(m_height) : 1.0f;
@@ -207,6 +209,12 @@ void Dx11Renderer::renderFrame() {
     ID3D11Buffer* constantBuffers[] = {m_objectBuffer.Get(), m_sceneBuffer.Get()};
     m_context->VSSetConstantBuffers(0, 2, constantBuffers);
 
+    for (const std::shared_ptr<AutoRotatable>& autoRotatable : m_autoRotatables) {
+        if (autoRotatable) {
+            autoRotatable->updateRotation(deltaTime);
+        }
+    }
+
     for (const std::shared_ptr<RenderItem>& renderItem : m_renderItems) {
         if (!renderItem) {
             continue;
@@ -217,7 +225,7 @@ void Dx11Renderer::renderFrame() {
             continue;
         }
 
-        const DirectX::XMMATRIX modelMatrix = renderItem->buildModelMatrix(elapsedSec);
+        const DirectX::XMMATRIX modelMatrix = renderItem->buildModelMatrix();
 
         ObjectBuffer objectBuffer{};
         DirectX::XMStoreFloat4x4(&objectBuffer.modelMatrix, modelMatrix);
@@ -253,9 +261,19 @@ bool Dx11Renderer::resize(std::uint32_t width, std::uint32_t height) {
     return createBackBufferTarget() && createDepthResources();
 }
 
-void Dx11Renderer::adjustCamera(float deltaYaw, float deltaPitch) { m_camera.adjustAngles(deltaYaw, deltaPitch); }
+void Dx11Renderer::adjustCamera(float deltaDirection, float deltaTilt) {
+    m_camera.adjustAngles(deltaDirection, deltaTilt);
+}
 
 void Dx11Renderer::moveCamera(float forwardDelta, float rightDelta) { m_camera.moveLocal(forwardDelta, rightDelta); }
+
+void Dx11Renderer::toggleSceneAutoRotation() {
+    for (const std::shared_ptr<AutoRotatable>& autoRotatable : m_autoRotatables) {
+        if (autoRotatable) {
+            autoRotatable->toggleAutoRotation();
+        }
+    }
+}
 
 void Dx11Renderer::shutdown() {
     releaseRenderTargets();
@@ -283,7 +301,7 @@ void Dx11Renderer::shutdown() {
 
     m_width = 0;
     m_height = 0;
-    m_hasStartTime = false;
+    m_hasLastFrameTime = false;
 }
 
 bool Dx11Renderer::createBackBufferTarget() {
@@ -386,9 +404,12 @@ bool Dx11Renderer::createPipelineResources() {
 
 bool Dx11Renderer::buildScene() {
     m_renderItems.clear();
+    m_autoRotatables.clear();
 
     CubeRenderItem::Params cubeParams{};
-    cubeParams.size = CubeRenderItem::kDefaultSize;
+    cubeParams.size = 1.0f;
+    cubeParams.rotationSpeed = 0.8f;
+    cubeParams.rotationOffset = 0.0f;
 
     auto cube = std::make_shared<CubeRenderItem>(m_device.Get(), cubeParams);
     if (!cube->mesh() || !cube->mesh()->isValid()) {
@@ -396,6 +417,7 @@ bool Dx11Renderer::buildScene() {
     }
 
     m_renderItems.push_back(cube);
+    m_autoRotatables.push_back(cube);
     return true;
 }
 
@@ -411,6 +433,7 @@ void Dx11Renderer::releaseRenderTargets() {
 
 void Dx11Renderer::releaseSceneResources() {
     m_renderItems.clear();
+    m_autoRotatables.clear();
 
     m_sceneBuffer.Reset();
     m_objectBuffer.Reset();

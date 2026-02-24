@@ -10,12 +10,13 @@
 #pragma warning(pop)
 #endif
 
-#include "camera.h"
-
 #include <chrono>
 #include <cstdint>
 #include <memory>
 #include <vector>
+
+#include "ObjectInterfaces/AutoRotatable.h"
+#include "Camera.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -32,8 +33,9 @@ public:
     bool initialize(HWND window);
     void renderFrame();
     bool resize(std::uint32_t width, std::uint32_t height);
-    void adjustCamera(float deltaYaw, float deltaPitch);
+    void adjustCamera(float deltaDirection, float deltaTilt);
     void moveCamera(float forwardDelta, float rightDelta);
+    void toggleSceneAutoRotation();
     void shutdown();
 
 private:
@@ -57,9 +59,10 @@ private:
     ComPtr<ID3D11Buffer> m_objectBuffer;
     ComPtr<ID3D11Buffer> m_sceneBuffer;
     std::vector<std::shared_ptr<RenderItem>> m_renderItems;
+    std::vector<std::shared_ptr<AutoRotatable>> m_autoRotatables;
     Camera m_camera;
-    std::chrono::steady_clock::time_point m_startTime = {};
-    bool m_hasStartTime = false;
+    std::chrono::steady_clock::time_point m_lastFrameTime = {};
+    bool m_hasLastFrameTime = false;
     std::uint32_t m_width = 0;
     std::uint32_t m_height = 0;
 };

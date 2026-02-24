@@ -1,8 +1,9 @@
 #include "app.h"
 
+#include <chrono>
 #include <cstdint>
 
-#include "dx11_renderer.h"
+#include "Dx11Renderer.h"
 #include "framework.h"
 
 namespace {
@@ -10,12 +11,16 @@ constexpr std::int32_t kWindowWidth = 1280;
 constexpr std::int32_t kWindowHeight = 720;
 constexpr wchar_t kWindowClassName[] = L"CG2026task3Window";
 constexpr wchar_t kWindowTitle[] = L"task3 DirectX11";
-constexpr float kKeyboardMoveStep = 0.08f;
+constexpr float kKeyboardMoveSpeed = 3.0f;
 constexpr float kMouseSensitivity = 0.01f;
 
 Dx11Renderer renderer;
 bool isDragging = false;
 POINT lastMousePos{};
+bool isMoveForwardPressed = false;
+bool isMoveBackwardPressed = false;
+bool isMoveLeftPressed = false;
+bool isMoveRightPressed = false;
 
 bool initMainWindow(HINSTANCE hInstance, int commandShowMode) {
     RECT windowBounds{0, 0, kWindowWidth, kWindowHeight};
@@ -54,28 +59,53 @@ LRESULT CALLBACK wndProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam
             EndPaint(window, &paint);
             return 0;
         }
-        case WM_DESTROY:
-            renderer.shutdown();
-            PostQuitMessage(0);
-            return 0;
         case WM_KEYDOWN:
             switch (wParam) {
                 case 'A':
-                    renderer.moveCamera(0.0f, -kKeyboardMoveStep);
+                    isMoveLeftPressed = true;
                     return 0;
                 case 'D':
-                    renderer.moveCamera(0.0f, kKeyboardMoveStep);
+                    isMoveRightPressed = true;
                     return 0;
                 case 'W':
-                    renderer.moveCamera(kKeyboardMoveStep, 0.0f);
+                    isMoveForwardPressed = true;
                     return 0;
                 case 'S':
-                    renderer.moveCamera(-kKeyboardMoveStep, 0.0f);
+                    isMoveBackwardPressed = true;
+                    return 0;
+                case VK_SPACE:
+                    if ((lParam & (1 << 30)) == 0) {
+                        renderer.toggleSceneAutoRotation();
+                    }
                     return 0;
                 default:
                     break;
             }
             return DefWindowProc(window, message, wParam, lParam);
+        case WM_KEYUP:
+            switch (wParam) {
+                case 'A':
+                    isMoveLeftPressed = false;
+                    return 0;
+                case 'D':
+                    isMoveRightPressed = false;
+                    return 0;
+                case 'W':
+                    isMoveForwardPressed = false;
+                    return 0;
+                case 'S':
+                    isMoveBackwardPressed = false;
+                    return 0;
+                default:
+                    break;
+            }
+            return DefWindowProc(window, message, wParam, lParam);
+        case WM_KILLFOCUS:
+            isMoveForwardPressed = false;
+            isMoveBackwardPressed = false;
+            isMoveLeftPressed = false;
+            isMoveRightPressed = false;
+            return 0;
         case WM_LBUTTONDOWN:
             isDragging = true;
             lastMousePos.x = static_cast<short>(LOWORD(lParam));
@@ -97,6 +127,14 @@ LRESULT CALLBACK wndProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam
         case WM_LBUTTONUP:
             isDragging = false;
             ReleaseCapture();
+            return 0;
+        case WM_DESTROY:
+            isMoveForwardPressed = false;
+            isMoveBackwardPressed = false;
+            isMoveLeftPressed = false;
+            isMoveRightPressed = false;
+            renderer.shutdown();
+            PostQuitMessage(0);
             return 0;
         default:
             return DefWindowProc(window, message, wParam, lParam);
@@ -130,6 +168,7 @@ int runApp(HINSTANCE hInstance, int commandShowMode) {
 
     MSG messageData{};
     bool exitRequested = false;
+    auto lastTick = std::chrono::steady_clock::now();
 
     while (!exitRequested) {
         while (PeekMessage(&messageData, nullptr, 0, 0, PM_REMOVE)) {
@@ -143,6 +182,27 @@ int runApp(HINSTANCE hInstance, int commandShowMode) {
         }
 
         if (!exitRequested) {
+            const auto currentTick = std::chrono::steady_clock::now();
+            const std::chrono::duration<float> deltaTime = currentTick - lastTick;
+            lastTick = currentTick;
+
+            float forwardAxis = 0.0f;
+            float rightAxis = 0.0f;
+            if (isMoveForwardPressed) {
+                forwardAxis += 1.0f;
+            }
+            if (isMoveBackwardPressed) {
+                forwardAxis -= 1.0f;
+            }
+            if (isMoveRightPressed) {
+                rightAxis += 1.0f;
+            }
+            if (isMoveLeftPressed) {
+                rightAxis -= 1.0f;
+            }
+
+            renderer.moveCamera(forwardAxis * kKeyboardMoveSpeed * deltaTime.count(),
+                                rightAxis * kKeyboardMoveSpeed * deltaTime.count());
             renderer.renderFrame();
         }
     }

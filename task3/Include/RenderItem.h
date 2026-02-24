@@ -10,12 +10,12 @@
 
 #include <memory>
 
-#include "mesh.h"
+#include "Mesh.h"
 
 class RenderItem {
 public:
     virtual ~RenderItem() = default;
 
     virtual const std::shared_ptr<Mesh>& mesh() const = 0;
-    virtual DirectX::XMMATRIX buildModelMatrix(float elapsedSec) const = 0;
+    virtual DirectX::XMMATRIX buildModelMatrix() const = 0;
 };

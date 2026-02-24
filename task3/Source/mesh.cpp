@@ -1,20 +1,20 @@
-#include "mesh.h"
+#include "Mesh.h"
 
 #include <utility>
 
 Mesh::Mesh(ComPtr<ID3D11Buffer>&& vertexBuffer, ComPtr<ID3D11Buffer>&& indexBuffer, DXGI_FORMAT indexFormat,
            std::uint32_t indexCount, std::uint32_t vertexStride)
-    : m_vertexBuffer(std::move(vertexBuffer)),
-      m_indexBuffer(std::move(indexBuffer)),
-      m_indexFormat(indexFormat),
-      m_indexCount(indexCount),
-      m_vertexStride(vertexStride) {}
+    : m_vertexBuffer(std::move(vertexBuffer))
+    , m_indexBuffer(std::move(indexBuffer))
+    , m_indexFormat(indexFormat)
+    , m_indexCount(indexCount)
+    , m_vertexStride(vertexStride) {}
 
 std::shared_ptr<Mesh> Mesh::createIndexedU16Immutable(ID3D11Device* device, const void* vertexData,
-                                                       std::uint32_t vertexDataSize, std::uint32_t vertexStride,
-                                                       const std::uint16_t* indexData, std::uint32_t indexCount) {
-    if (device == nullptr || vertexData == nullptr || vertexDataSize == 0 || vertexStride == 0 || indexData == nullptr ||
-        indexCount == 0) {
+                                                      std::uint32_t vertexDataSize, std::uint32_t vertexStride,
+                                                      const std::uint16_t* indexData, std::uint32_t indexCount) {
+    if (device == nullptr || vertexData == nullptr || vertexDataSize == 0 || vertexStride == 0 ||
+        indexData == nullptr || indexCount == 0) {
         return nullptr;
     }
 

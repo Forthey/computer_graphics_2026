@@ -33,9 +33,6 @@
     <ClInclude Include="Include\mesh.h">
       <Filter>Include</Filter>
     </ClInclude>
-    <ClInclude Include="Include\rotation_controllable.h">
-      <Filter>Include</Filter>
-    </ClInclude>
     <ClInclude Include="Include\render_item.h">
       <Filter>Include</Filter>
     </ClInclude>
@@ -45,6 +42,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\app.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\camera.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\cube_render_item.cpp">

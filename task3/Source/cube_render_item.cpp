@@ -13,9 +13,6 @@ struct Vertex {
 }  // namespace
 
 CubeRenderItem::CubeRenderItem(ID3D11Device* device, const Params& params) {
-    m_rotationSpeed = params.rotationSpeed;
-    m_rotationOffset = params.rotationOffset;
-
     const float halfSize = (std::max)(kMinCubeSize, params.size * 0.5f);
 
     const std::array<Vertex, 8> vertices = {
@@ -41,22 +38,4 @@ CubeRenderItem::CubeRenderItem(ID3D11Device* device, const Params& params) {
 
 const std::shared_ptr<Mesh>& CubeRenderItem::mesh() const { return m_mesh; }
 
-DirectX::XMMATRIX CubeRenderItem::buildModelMatrix(float elapsedSec) const {
-    float effectiveElapsedSec = elapsedSec - m_accumulatedPausedSec;
-    if (m_isRotationPaused) {
-        effectiveElapsedSec = m_pauseStartedAtSec - m_accumulatedPausedSec;
-    }
-
-    return DirectX::XMMatrixRotationY(effectiveElapsedSec * m_rotationSpeed + m_rotationOffset);
-}
-
-void CubeRenderItem::toggleRotation(float elapsedSec) {
-    if (m_isRotationPaused) {
-        m_accumulatedPausedSec += (elapsedSec - m_pauseStartedAtSec);
-        m_isRotationPaused = false;
-        return;
-    }
-
-    m_pauseStartedAtSec = elapsedSec;
-    m_isRotationPaused = true;
-}
+DirectX::XMMATRIX CubeRenderItem::buildModelMatrix(float /*elapsedSec*/) const { return DirectX::XMMatrixIdentity(); }

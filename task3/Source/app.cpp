@@ -10,7 +10,7 @@ constexpr std::int32_t kWindowWidth = 1280;
 constexpr std::int32_t kWindowHeight = 720;
 constexpr wchar_t kWindowClassName[] = L"CG2026task3Window";
 constexpr wchar_t kWindowTitle[] = L"task3 DirectX11";
-constexpr float kKeyboardCameraStep = 0.08f;
+constexpr float kKeyboardMoveStep = 0.08f;
 constexpr float kMouseSensitivity = 0.01f;
 
 Dx11Renderer renderer;
@@ -61,19 +61,16 @@ LRESULT CALLBACK wndProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam
         case WM_KEYDOWN:
             switch (wParam) {
                 case 'A':
-                    renderer.adjustCamera(-kKeyboardCameraStep, 0.0f);
+                    renderer.moveCamera(0.0f, -kKeyboardMoveStep);
                     return 0;
                 case 'D':
-                    renderer.adjustCamera(kKeyboardCameraStep, 0.0f);
+                    renderer.moveCamera(0.0f, kKeyboardMoveStep);
                     return 0;
                 case 'W':
-                    renderer.adjustCamera(0.0f, kKeyboardCameraStep);
+                    renderer.moveCamera(kKeyboardMoveStep, 0.0f);
                     return 0;
                 case 'S':
-                    renderer.adjustCamera(0.0f, -kKeyboardCameraStep);
-                    return 0;
-                case VK_SPACE:
-                    renderer.toggleSceneRotation();
+                    renderer.moveCamera(-kKeyboardMoveStep, 0.0f);
                     return 0;
                 default:
                     break;
@@ -92,7 +89,7 @@ LRESULT CALLBACK wndProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam
                 const int dx = mouseX - lastMousePos.x;
                 const int dy = mouseY - lastMousePos.y;
                 renderer.adjustCamera(static_cast<float>(dx) * kMouseSensitivity,
-                                      static_cast<float>(dy) * kMouseSensitivity);
+                                      static_cast<float>(-dy) * kMouseSensitivity);
                 lastMousePos.x = mouseX;
                 lastMousePos.y = mouseY;
             }

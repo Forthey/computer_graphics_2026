@@ -11,7 +11,6 @@
 #endif
 
 #include "camera.h"
-#include "rotation_controllable.h"
 
 #include <chrono>
 #include <cstdint>
@@ -34,7 +33,7 @@ public:
     void renderFrame();
     bool resize(std::uint32_t width, std::uint32_t height);
     void adjustCamera(float deltaYaw, float deltaPitch);
-    void toggleSceneRotation();
+    void moveCamera(float forwardDelta, float rightDelta);
     void shutdown();
 
 private:
@@ -58,7 +57,6 @@ private:
     ComPtr<ID3D11Buffer> m_objectBuffer;
     ComPtr<ID3D11Buffer> m_sceneBuffer;
     std::vector<std::shared_ptr<RenderItem>> m_renderItems;
-    std::vector<std::shared_ptr<IRotationControllable>> m_rotationControllables;
     Camera m_camera;
     std::chrono::steady_clock::time_point m_startTime = {};
     bool m_hasStartTime = false;

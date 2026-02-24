@@ -255,20 +255,7 @@ bool Dx11Renderer::resize(std::uint32_t width, std::uint32_t height) {
 
 void Dx11Renderer::adjustCamera(float deltaYaw, float deltaPitch) { m_camera.adjustAngles(deltaYaw, deltaPitch); }
 
-void Dx11Renderer::toggleSceneRotation() {
-    const auto now = std::chrono::steady_clock::now();
-    if (!m_hasStartTime) {
-        m_startTime = now;
-        m_hasStartTime = true;
-    }
-
-    const float elapsedSec = std::chrono::duration<float>(now - m_startTime).count();
-    for (const std::shared_ptr<IRotationControllable>& controllable : m_rotationControllables) {
-        if (controllable) {
-            controllable->toggleRotation(elapsedSec);
-        }
-    }
-}
+void Dx11Renderer::moveCamera(float forwardDelta, float rightDelta) { m_camera.moveLocal(forwardDelta, rightDelta); }
 
 void Dx11Renderer::shutdown() {
     releaseRenderTargets();
@@ -399,12 +386,9 @@ bool Dx11Renderer::createPipelineResources() {
 
 bool Dx11Renderer::buildScene() {
     m_renderItems.clear();
-    m_rotationControllables.clear();
 
     CubeRenderItem::Params cubeParams{};
     cubeParams.size = CubeRenderItem::kDefaultSize;
-    cubeParams.rotationSpeed = CubeRenderItem::kDefaultRotationSpeed;
-    cubeParams.rotationOffset = CubeRenderItem::kDefaultRotationOffset;
 
     auto cube = std::make_shared<CubeRenderItem>(m_device.Get(), cubeParams);
     if (!cube->mesh() || !cube->mesh()->isValid()) {
@@ -412,7 +396,6 @@ bool Dx11Renderer::buildScene() {
     }
 
     m_renderItems.push_back(cube);
-    m_rotationControllables.push_back(cube);
     return true;
 }
 
@@ -428,7 +411,6 @@ void Dx11Renderer::releaseRenderTargets() {
 
 void Dx11Renderer::releaseSceneResources() {
     m_renderItems.clear();
-    m_rotationControllables.clear();
 
     m_sceneBuffer.Reset();
     m_objectBuffer.Reset();

@@ -10,10 +10,17 @@
 #pragma warning(pop)
 #endif
 
+#include "camera.h"
+#include "rotation_controllable.h"
+
 #include <chrono>
 #include <cstdint>
+#include <memory>
+#include <vector>
 
 using Microsoft::WRL::ComPtr;
+
+class RenderItem;
 
 class Dx11Renderer {
 public:
@@ -27,14 +34,16 @@ public:
     void renderFrame();
     bool resize(std::uint32_t width, std::uint32_t height);
     void adjustCamera(float deltaYaw, float deltaPitch);
+    void toggleSceneRotation();
     void shutdown();
 
 private:
     bool createBackBufferTarget();
     bool createDepthResources();
-    bool createCubeResources();
+    bool createPipelineResources();
+    bool buildScene();
     void releaseRenderTargets();
-    void releaseCubeResources();
+    void releaseSceneResources();
 
     ComPtr<ID3D11Device> m_device;
     ComPtr<ID3D11DeviceContext> m_context;
@@ -46,14 +55,13 @@ private:
     ComPtr<ID3D11PixelShader> m_pixelShader;
     ComPtr<ID3D11InputLayout> m_vertexLayout;
     ComPtr<ID3D11RasterizerState> m_rasterizerState;
-    ComPtr<ID3D11Buffer> m_cubeVertices;
-    ComPtr<ID3D11Buffer> m_cubeIndices;
     ComPtr<ID3D11Buffer> m_objectBuffer;
     ComPtr<ID3D11Buffer> m_sceneBuffer;
+    std::vector<std::shared_ptr<RenderItem>> m_renderItems;
+    std::vector<std::shared_ptr<IRotationControllable>> m_rotationControllables;
+    Camera m_camera;
     std::chrono::steady_clock::time_point m_startTime = {};
     bool m_hasStartTime = false;
-    float m_cameraYaw = 0.0f;
-    float m_cameraPitch = 0.2f;
     std::uint32_t m_width = 0;
     std::uint32_t m_height = 0;
 };

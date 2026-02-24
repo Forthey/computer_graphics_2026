@@ -12,18 +12,21 @@
 #pragma warning(pop)
 #endif
 
-#include <algorithm>
 #include <cassert>
-#include <cmath>
 #include <cwchar>
+#include <memory>
 
+#include "cube_render_item.h"
 #include "framework.h"
+#include "render_item.h"
 
 namespace {
-struct Vertex {
-    float position[3];
-    float color[3];
-};
+constexpr std::uint32_t kSwapChainBufferCount = 2;
+constexpr std::uint32_t kSampleCount = 1;
+constexpr float kClearColor[4] = {0.12f, 0.18f, 0.24f, 1.0f};
+constexpr float kViewportMinDepth = 0.0f;
+constexpr float kViewportMaxDepth = 1.0f;
+constexpr float kClearDepthValue = 1.0f;
 
 struct ObjectBuffer {
     DirectX::XMFLOAT4X4 modelMatrix;
@@ -51,7 +54,7 @@ HRESULT compileShaderFromFile(const wchar_t* shaderPath, const char* entryPoint,
 
         ComPtr<ID3DBlob> errorMessages;
         const HRESULT result = D3DCompileFromFile(fullPath, nullptr, D3D_COMPILE_STANDARD_FILE_INCLUDE, entryPoint,
-                                                  target, static_cast<UINT>(compileFlags), 0,
+                                                  target, static_cast<unsigned int>(compileFlags), 0,
                                                   compiledCode.ReleaseAndGetAddressOf(), errorMessages.GetAddressOf());
         if (SUCCEEDED(result)) {
             return result;
@@ -113,7 +116,7 @@ bool Dx11Renderer::initialize(HWND window) {
 #endif
 
     result =
-        D3D11CreateDevice(selectedAdapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, static_cast<UINT>(flags), levels, 1,
+        D3D11CreateDevice(selectedAdapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, static_cast<unsigned int>(flags), levels, 1,
                           D3D11_SDK_VERSION, m_device.GetAddressOf(), &featureLevel, m_context.GetAddressOf());
 
     if (FAILED(result) || featureLevel != D3D_FEATURE_LEVEL_11_0) {
@@ -121,7 +124,7 @@ bool Dx11Renderer::initialize(HWND window) {
     }
 
     DXGI_SWAP_CHAIN_DESC swapChainSetup{};
-    swapChainSetup.BufferCount = 2;
+    swapChainSetup.BufferCount = kSwapChainBufferCount;
     swapChainSetup.BufferDesc.Width = m_width;
     swapChainSetup.BufferDesc.Height = m_height;
     swapChainSetup.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -131,7 +134,7 @@ bool Dx11Renderer::initialize(HWND window) {
     swapChainSetup.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
     swapChainSetup.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     swapChainSetup.OutputWindow = window;
-    swapChainSetup.SampleDesc.Count = 1;
+    swapChainSetup.SampleDesc.Count = kSampleCount;
     swapChainSetup.SampleDesc.Quality = 0;
     swapChainSetup.Windowed = true;
     swapChainSetup.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
@@ -143,7 +146,7 @@ bool Dx11Renderer::initialize(HWND window) {
         return false;
     }
 
-    if (!createBackBufferTarget() || !createDepthResources() || !createCubeResources()) {
+    if (!createBackBufferTarget() || !createDepthResources() || !createPipelineResources() || !buildScene()) {
         shutdown();
         return false;
     }
@@ -161,29 +164,22 @@ void Dx11Renderer::renderFrame() {
     ID3D11RenderTargetView* targets[] = {m_backBufferTarget.Get()};
     m_context->OMSetRenderTargets(1, targets, m_depthTarget.Get());
 
-    static const FLOAT clearColor[4] = {0.12f, 0.18f, 0.24f, 1.0f};
-    m_context->ClearRenderTargetView(m_backBufferTarget.Get(), clearColor);
-    m_context->ClearDepthStencilView(m_depthTarget.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
+    m_context->ClearRenderTargetView(m_backBufferTarget.Get(), kClearColor);
+    m_context->ClearDepthStencilView(m_depthTarget.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, kClearDepthValue,
+                                     0);
 
     D3D11_VIEWPORT viewport{};
     viewport.TopLeftX = 0.0f;
     viewport.TopLeftY = 0.0f;
-    viewport.Width = static_cast<FLOAT>(m_width);
-    viewport.Height = static_cast<FLOAT>(m_height);
-    viewport.MinDepth = 0.0f;
-    viewport.MaxDepth = 1.0f;
+    viewport.Width = static_cast<float>(m_width);
+    viewport.Height = static_cast<float>(m_height);
+    viewport.MinDepth = kViewportMinDepth;
+    viewport.MaxDepth = kViewportMaxDepth;
     m_context->RSSetViewports(1, &viewport);
     m_context->RSSetState(m_rasterizerState.Get());
 
     m_context->IASetInputLayout(m_vertexLayout.Get());
     m_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-    constexpr std::uint32_t vertexStep = sizeof(Vertex);
-    constexpr std::uint32_t startOffset = 0;
-    ID3D11Buffer* geometry[] = {m_cubeVertices.Get()};
-    m_context->IASetVertexBuffers(0, 1, geometry, &vertexStep, &startOffset);
-    m_context->IASetIndexBuffer(m_cubeIndices.Get(), DXGI_FORMAT_R16_UINT, 0);
-
     m_context->VSSetShader(m_vertexShader.Get(), nullptr, 0);
     m_context->PSSetShader(m_pixelShader.Get(), nullptr, 0);
 
@@ -194,25 +190,10 @@ void Dx11Renderer::renderFrame() {
     }
     const float elapsedSec = std::chrono::duration<float>(now - m_startTime).count();
 
-    const DirectX::XMMATRIX modelMatrix = DirectX::XMMatrixRotationY(elapsedSec * 0.8f);
-
-    const float distance = 3.0f;
-    const float cosPitch = std::cos(m_cameraPitch);
-    const DirectX::XMVECTOR eye = DirectX::XMVectorSet(std::sin(m_cameraYaw) * cosPitch * distance,
-                                                        std::sin(m_cameraPitch) * distance,
-                                                        std::cos(m_cameraYaw) * cosPitch * distance, 1.0f);
-    const DirectX::XMVECTOR at = DirectX::XMVectorZero();
-    const DirectX::XMVECTOR up = DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
-    const DirectX::XMMATRIX viewMatrix = DirectX::XMMatrixLookAtLH(eye, at, up);
-
+    const DirectX::XMMATRIX viewMatrix = m_camera.buildViewMatrix();
     const float aspect = (m_height != 0) ? static_cast<float>(m_width) / static_cast<float>(m_height) : 1.0f;
-    const DirectX::XMMATRIX projectionMatrix =
-        DirectX::XMMatrixPerspectiveFovLH(DirectX::XM_PI / 3.0f, aspect, 0.1f, 100.0f);
+    const DirectX::XMMATRIX projectionMatrix = m_camera.buildProjectionMatrix(aspect);
     const DirectX::XMMATRIX viewProjectionMatrix = DirectX::XMMatrixMultiply(viewMatrix, projectionMatrix);
-
-    ObjectBuffer objectBuffer{};
-    DirectX::XMStoreFloat4x4(&objectBuffer.modelMatrix, modelMatrix);
-    m_context->UpdateSubresource(m_objectBuffer.Get(), 0, nullptr, &objectBuffer, 0, 0);
 
     D3D11_MAPPED_SUBRESOURCE mapped{};
     const HRESULT mapResult = m_context->Map(m_sceneBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
@@ -226,7 +207,30 @@ void Dx11Renderer::renderFrame() {
     ID3D11Buffer* constantBuffers[] = {m_objectBuffer.Get(), m_sceneBuffer.Get()};
     m_context->VSSetConstantBuffers(0, 2, constantBuffers);
 
-    m_context->DrawIndexed(36, 0, 0);
+    for (const std::shared_ptr<RenderItem>& renderItem : m_renderItems) {
+        if (!renderItem) {
+            continue;
+        }
+
+        const std::shared_ptr<Mesh>& mesh = renderItem->mesh();
+        if (!mesh || !mesh->isValid()) {
+            continue;
+        }
+
+        const DirectX::XMMATRIX modelMatrix = renderItem->buildModelMatrix(elapsedSec);
+
+        ObjectBuffer objectBuffer{};
+        DirectX::XMStoreFloat4x4(&objectBuffer.modelMatrix, modelMatrix);
+        m_context->UpdateSubresource(m_objectBuffer.Get(), 0, nullptr, &objectBuffer, 0, 0);
+
+        const std::uint32_t vertexStride = mesh->vertexStride();
+        constexpr std::uint32_t startOffset = 0;
+        ID3D11Buffer* geometry[] = {mesh->vertexBuffer()};
+        m_context->IASetVertexBuffers(0, 1, geometry, &vertexStride, &startOffset);
+        m_context->IASetIndexBuffer(mesh->indexBuffer(), mesh->indexFormat(), 0);
+
+        m_context->DrawIndexed(mesh->indexCount(), 0, 0);
+    }
 
     const HRESULT result = m_swapChain->Present(0, 0);
     assert(SUCCEEDED(result));
@@ -249,15 +253,26 @@ bool Dx11Renderer::resize(std::uint32_t width, std::uint32_t height) {
     return createBackBufferTarget() && createDepthResources();
 }
 
-void Dx11Renderer::adjustCamera(float deltaYaw, float deltaPitch) {
-    m_cameraYaw += deltaYaw;
-    m_cameraPitch += deltaPitch;
-    m_cameraPitch = std::clamp(m_cameraPitch, -1.45f, 1.45f);
+void Dx11Renderer::adjustCamera(float deltaYaw, float deltaPitch) { m_camera.adjustAngles(deltaYaw, deltaPitch); }
+
+void Dx11Renderer::toggleSceneRotation() {
+    const auto now = std::chrono::steady_clock::now();
+    if (!m_hasStartTime) {
+        m_startTime = now;
+        m_hasStartTime = true;
+    }
+
+    const float elapsedSec = std::chrono::duration<float>(now - m_startTime).count();
+    for (const std::shared_ptr<IRotationControllable>& controllable : m_rotationControllables) {
+        if (controllable) {
+            controllable->toggleRotation(elapsedSec);
+        }
+    }
 }
 
 void Dx11Renderer::shutdown() {
     releaseRenderTargets();
-    releaseCubeResources();
+    releaseSceneResources();
     m_swapChain.Reset();
 
     if (m_context) {
@@ -304,7 +319,7 @@ bool Dx11Renderer::createDepthResources() {
     depthDesc.MipLevels = 1;
     depthDesc.ArraySize = 1;
     depthDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    depthDesc.SampleDesc.Count = 1;
+    depthDesc.SampleDesc.Count = kSampleCount;
     depthDesc.Usage = D3D11_USAGE_DEFAULT;
     depthDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
 
@@ -317,7 +332,7 @@ bool Dx11Renderer::createDepthResources() {
     return SUCCEEDED(result);
 }
 
-bool Dx11Renderer::createCubeResources() {
+bool Dx11Renderer::createPipelineResources() {
     ComPtr<ID3DBlob> vertexCode;
     ComPtr<ID3DBlob> pixelCode;
     HRESULT result = compileShaderFromFile(L"Shaders/triangle_vs.hlsl", "main", "vs_5_0", vertexCode);
@@ -362,54 +377,8 @@ bool Dx11Renderer::createCubeResources() {
         return false;
     }
 
-    static constexpr Vertex vertices[] = {
-        {{-0.5f, -0.5f, -0.5f}, {1.0f, 0.2f, 0.2f}},
-        {{-0.5f, 0.5f, -0.5f}, {0.2f, 1.0f, 0.2f}},
-        {{0.5f, 0.5f, -0.5f}, {0.2f, 0.2f, 1.0f}},
-        {{0.5f, -0.5f, -0.5f}, {1.0f, 1.0f, 0.2f}},
-        {{-0.5f, -0.5f, 0.5f}, {1.0f, 0.2f, 1.0f}},
-        {{-0.5f, 0.5f, 0.5f}, {0.2f, 1.0f, 1.0f}},
-        {{0.5f, 0.5f, 0.5f}, {1.0f, 0.6f, 0.2f}},
-        {{0.5f, -0.5f, 0.5f}, {0.6f, 0.6f, 1.0f}},
-    };
-
-    static constexpr std::uint16_t indices[] = {
-        0, 1, 2, 0, 2, 3,
-        4, 6, 5, 4, 7, 6,
-        4, 5, 1, 4, 1, 0,
-        3, 2, 6, 3, 6, 7,
-        1, 5, 6, 1, 6, 2,
-        4, 0, 3, 4, 3, 7,
-    };
-
-    D3D11_BUFFER_DESC vertexBufferDesc{};
-    vertexBufferDesc.ByteWidth = static_cast<UINT>(sizeof(vertices));
-    vertexBufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
-    vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-
-    D3D11_SUBRESOURCE_DATA vertexData{};
-    vertexData.pSysMem = vertices;
-
-    result = m_device->CreateBuffer(&vertexBufferDesc, &vertexData, m_cubeVertices.GetAddressOf());
-    if (FAILED(result)) {
-        return false;
-    }
-
-    D3D11_BUFFER_DESC indexBufferDesc{};
-    indexBufferDesc.ByteWidth = static_cast<UINT>(sizeof(indices));
-    indexBufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
-    indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;
-
-    D3D11_SUBRESOURCE_DATA indexData{};
-    indexData.pSysMem = indices;
-
-    result = m_device->CreateBuffer(&indexBufferDesc, &indexData, m_cubeIndices.GetAddressOf());
-    if (FAILED(result)) {
-        return false;
-    }
-
     D3D11_BUFFER_DESC objectBufferDesc{};
-    objectBufferDesc.ByteWidth = static_cast<UINT>(sizeof(ObjectBuffer));
+    objectBufferDesc.ByteWidth = static_cast<unsigned int>(sizeof(ObjectBuffer));
     objectBufferDesc.Usage = D3D11_USAGE_DEFAULT;
     objectBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
 
@@ -419,13 +388,32 @@ bool Dx11Renderer::createCubeResources() {
     }
 
     D3D11_BUFFER_DESC sceneBufferDesc{};
-    sceneBufferDesc.ByteWidth = static_cast<UINT>(sizeof(SceneBuffer));
+    sceneBufferDesc.ByteWidth = static_cast<unsigned int>(sizeof(SceneBuffer));
     sceneBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
     sceneBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     sceneBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
     result = m_device->CreateBuffer(&sceneBufferDesc, nullptr, m_sceneBuffer.GetAddressOf());
     return SUCCEEDED(result);
+}
+
+bool Dx11Renderer::buildScene() {
+    m_renderItems.clear();
+    m_rotationControllables.clear();
+
+    CubeRenderItem::Params cubeParams{};
+    cubeParams.size = CubeRenderItem::kDefaultSize;
+    cubeParams.rotationSpeed = CubeRenderItem::kDefaultRotationSpeed;
+    cubeParams.rotationOffset = CubeRenderItem::kDefaultRotationOffset;
+
+    auto cube = std::make_shared<CubeRenderItem>(m_device.Get(), cubeParams);
+    if (!cube->mesh() || !cube->mesh()->isValid()) {
+        return false;
+    }
+
+    m_renderItems.push_back(cube);
+    m_rotationControllables.push_back(cube);
+    return true;
 }
 
 void Dx11Renderer::releaseRenderTargets() {
@@ -438,11 +426,12 @@ void Dx11Renderer::releaseRenderTargets() {
     m_backBufferTarget.Reset();
 }
 
-void Dx11Renderer::releaseCubeResources() {
+void Dx11Renderer::releaseSceneResources() {
+    m_renderItems.clear();
+    m_rotationControllables.clear();
+
     m_sceneBuffer.Reset();
     m_objectBuffer.Reset();
-    m_cubeIndices.Reset();
-    m_cubeVertices.Reset();
     m_rasterizerState.Reset();
     m_vertexLayout.Reset();
     m_pixelShader.Reset();

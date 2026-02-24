@@ -144,14 +144,21 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Include\app.h" />
+    <ClInclude Include="Include\camera.h" />
+    <ClInclude Include="Include\cube_render_item.h" />
     <ClInclude Include="Include\dx11_renderer.h" />
     <ClInclude Include="Include\framework.h" />
+    <ClInclude Include="Include\mesh.h" />
+    <ClInclude Include="Include\rotation_controllable.h" />
+    <ClInclude Include="Include\render_item.h" />
     <ClInclude Include="Include\targetver.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\app.cpp" />
+    <ClCompile Include="Source\cube_render_item.cpp" />
     <ClCompile Include="Source\dx11_renderer.cpp" />
     <ClCompile Include="Source\main.cpp" />
+    <ClCompile Include="Source\mesh.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\triangle_ps.hlsl" />

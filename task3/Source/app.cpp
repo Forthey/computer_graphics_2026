@@ -72,6 +72,9 @@ LRESULT CALLBACK wndProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam
                 case 'S':
                     renderer.adjustCamera(0.0f, -kKeyboardCameraStep);
                     return 0;
+                case VK_SPACE:
+                    renderer.toggleSceneRotation();
+                    return 0;
                 default:
                     break;
             }

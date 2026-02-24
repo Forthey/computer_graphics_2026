@@ -18,10 +18,25 @@
     <ClInclude Include="Include\app.h">
       <Filter>Include</Filter>
     </ClInclude>
+    <ClInclude Include="Include\camera.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\cube_render_item.h">
+      <Filter>Include</Filter>
+    </ClInclude>
     <ClInclude Include="Include\dx11_renderer.h">
       <Filter>Include</Filter>
     </ClInclude>
     <ClInclude Include="Include\framework.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\mesh.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\rotation_controllable.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\render_item.h">
       <Filter>Include</Filter>
     </ClInclude>
     <ClInclude Include="Include\targetver.h">
@@ -32,10 +47,16 @@
     <ClCompile Include="Source\app.cpp">
       <Filter>Source</Filter>
     </ClCompile>
+    <ClCompile Include="Source\cube_render_item.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
     <ClCompile Include="Source\dx11_renderer.cpp">
       <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="Source\main.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\mesh.cpp">
       <Filter>Source</Filter>
     </ClCompile>
   </ItemGroup>

@@ -24,6 +24,8 @@ DirectX::XMMATRIX Camera::buildProjectionMatrix(float aspectRatio) const {
     return DirectX::XMMatrixPerspectiveFovLH(m_fovYRadians, aspectRatio, m_nearPlane, m_farPlane);
 }
 
+DirectX::XMFLOAT3 Camera::position() const { return DirectX::XMFLOAT3{m_positionX, m_positionY, m_positionZ}; }
+
 void Camera::moveLocal(float forwardDelta, float rightDelta) {
     move(forwardDelta, rightDelta, 0.0f);
 }

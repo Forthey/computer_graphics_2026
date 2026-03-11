@@ -3,8 +3,8 @@
 #ifdef _MSC_VER
 #pragma warning(push, 0)
 #endif
-#include <d3d11.h>
 #include <DirectXMath.h>
+#include <d3d11.h>
 #ifdef _MSC_VER
 #pragma warning(pop)
 #endif
@@ -24,6 +24,7 @@ public:
 
     CubeRenderItem(ID3D11Device* device, const Params& params);
 
+    RenderItemType type() const override;
     const std::shared_ptr<Mesh>& mesh() const override;
     DirectX::XMMATRIX buildModelMatrix() const override;
     void rotate(float deltaDirectionRadians, float deltaTiltRadians = 0.0f) override;

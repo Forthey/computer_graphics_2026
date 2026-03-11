@@ -9,17 +9,18 @@ cbuffer SceneBuffer : register(b1) {
 
 struct VSInput {
     float3 position : POSITION;
-    float2 uv : TEXCOORD;
 };
 
 struct VSOutput {
     float4 position : SV_POSITION;
-    float2 uv : TEXCOORD;
+    float3 direction : TEXCOORD;
 };
 
 VSOutput main(VSInput input) {
     VSOutput output;
-    output.position = mul(mul(float4(input.position, 1.0f), modelMatrix), viewProjectionMatrix);
-    output.uv = input.uv;
+    float4 scaledPosition = mul(float4(input.position, 0.0f), modelMatrix);
+    float4 worldPosition = float4(cameraPosition.xyz + scaledPosition.xyz, 1.0f);
+    output.position = mul(worldPosition, viewProjectionMatrix);
+    output.direction = normalize(input.position);
     return output;
 }

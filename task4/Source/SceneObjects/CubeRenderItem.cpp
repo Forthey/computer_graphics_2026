@@ -8,7 +8,7 @@ constexpr float kMinCubeSize = 0.001f;
 
 struct Vertex {
     float position[3];
-    float color[3];
+    float uv[2];
 };
 }  // namespace
 
@@ -18,25 +18,44 @@ CubeRenderItem::CubeRenderItem(ID3D11Device* device, const Params& params) {
 
     const float halfSize = (std::max)(kMinCubeSize, params.size * 0.5f);
 
-    const std::array<Vertex, 8> vertices = {
-        Vertex{{-halfSize, -halfSize, -halfSize}, {1.0f, 0.2f, 0.2f}},
-        Vertex{{-halfSize, halfSize, -halfSize}, {0.2f, 1.0f, 0.2f}},
-        Vertex{{halfSize, halfSize, -halfSize}, {0.2f, 0.2f, 1.0f}},
-        Vertex{{halfSize, -halfSize, -halfSize}, {1.0f, 1.0f, 0.2f}},
-        Vertex{{-halfSize, -halfSize, halfSize}, {1.0f, 0.2f, 1.0f}},
-        Vertex{{-halfSize, halfSize, halfSize}, {0.2f, 1.0f, 1.0f}},
-        Vertex{{halfSize, halfSize, halfSize}, {1.0f, 0.6f, 0.2f}},
-        Vertex{{halfSize, -halfSize, halfSize}, {0.6f, 0.6f, 1.0f}},
+    const std::array<Vertex, 24> vertices = {
+        Vertex{{-halfSize, -halfSize, halfSize}, {0.0f, 1.0f}},
+        Vertex{{halfSize, -halfSize, halfSize}, {1.0f, 1.0f}},
+        Vertex{{halfSize, halfSize, halfSize}, {1.0f, 0.0f}},
+        Vertex{{-halfSize, halfSize, halfSize}, {0.0f, 0.0f}},
+        Vertex{{halfSize, -halfSize, -halfSize}, {0.0f, 1.0f}},
+        Vertex{{-halfSize, -halfSize, -halfSize}, {1.0f, 1.0f}},
+        Vertex{{-halfSize, halfSize, -halfSize}, {1.0f, 0.0f}},
+        Vertex{{halfSize, halfSize, -halfSize}, {0.0f, 0.0f}},
+        Vertex{{-halfSize, -halfSize, -halfSize}, {0.0f, 1.0f}},
+        Vertex{{-halfSize, -halfSize, halfSize}, {1.0f, 1.0f}},
+        Vertex{{-halfSize, halfSize, halfSize}, {1.0f, 0.0f}},
+        Vertex{{-halfSize, halfSize, -halfSize}, {0.0f, 0.0f}},
+        Vertex{{halfSize, -halfSize, halfSize}, {0.0f, 1.0f}},
+        Vertex{{halfSize, -halfSize, -halfSize}, {1.0f, 1.0f}},
+        Vertex{{halfSize, halfSize, -halfSize}, {1.0f, 0.0f}},
+        Vertex{{halfSize, halfSize, halfSize}, {0.0f, 0.0f}},
+        Vertex{{-halfSize, halfSize, halfSize}, {0.0f, 1.0f}},
+        Vertex{{halfSize, halfSize, halfSize}, {1.0f, 1.0f}},
+        Vertex{{halfSize, halfSize, -halfSize}, {1.0f, 0.0f}},
+        Vertex{{-halfSize, halfSize, -halfSize}, {0.0f, 0.0f}},
+        Vertex{{-halfSize, -halfSize, -halfSize}, {0.0f, 1.0f}},
+        Vertex{{halfSize, -halfSize, -halfSize}, {1.0f, 1.0f}},
+        Vertex{{halfSize, -halfSize, halfSize}, {1.0f, 0.0f}},
+        Vertex{{-halfSize, -halfSize, halfSize}, {0.0f, 0.0f}},
     };
 
     static constexpr std::uint16_t indices[] = {
-        0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 4, 5, 1, 4, 1, 0, 3, 2, 6, 3, 6, 7, 1, 5, 6, 1, 6, 2, 4, 0, 3, 4, 3, 7,
+        0,  1,  2,  0,  2,  3,  4,  5,  6,  4,  6,  7,  8,  9,  10, 8,  10, 11,
+        12, 13, 14, 12, 14, 15, 16, 17, 18, 16, 18, 19, 20, 21, 22, 20, 22, 23,
     };
 
     m_mesh = Mesh::createIndexedU16Immutable(device, vertices.data(), static_cast<std::uint32_t>(sizeof(vertices)),
                                              static_cast<std::uint32_t>(sizeof(Vertex)), indices,
                                              static_cast<std::uint32_t>(std::size(indices)));
 }
+
+RenderItemType CubeRenderItem::type() const { return RenderItemType::OpaqueTextured; }
 
 const std::shared_ptr<Mesh>& CubeRenderItem::mesh() const { return m_mesh; }
 

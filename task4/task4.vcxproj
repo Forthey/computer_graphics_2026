@@ -144,26 +144,32 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Include\app.h" />
-    <ClInclude Include="Include\\ObjectInterfaces\\AutoRotatable.h" />
-    <ClInclude Include="Include\\Camera.h" />
-    <ClInclude Include="Include\\ObjectInterfaces\\Movable.h" />
+    <ClInclude Include="Include\ObjectInterfaces\AutoRotatable.h" />
+    <ClInclude Include="Include\Camera.h" />
+    <ClInclude Include="Include\ObjectInterfaces\Movable.h" />
     <ClInclude Include="Include\SceneObjects\CubeRenderItem.h" />
+    <ClInclude Include="Include\SceneObjects\SkyboxRenderItem.h" />
     <ClInclude Include="Include\Dx11Renderer.h" />
     <ClInclude Include="Include\framework.h" />
-    <ClInclude Include="Include\\Mesh.h" />
-    <ClInclude Include="Include\\ObjectInterfaces\\Rotatable.h" />
+    <ClInclude Include="Include\Mesh.h" />
+    <ClInclude Include="Include\ObjectInterfaces\Rotatable.h" />
     <ClInclude Include="Include\RenderItem.h" />
     <ClInclude Include="Include\targetver.h" />
+    <ClInclude Include="Include\TextureLoader.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\app.cpp" />
-    <ClCompile Include="Source\\Camera.cpp" />
-    <ClCompile Include="Source\\SceneObjects\\CubeRenderItem.cpp" />
-    <ClCompile Include="Source\\Dx11Renderer.cpp" />
+    <ClCompile Include="Source\Camera.cpp" />
+    <ClCompile Include="Source\SceneObjects\CubeRenderItem.cpp" />
+    <ClCompile Include="Source\SceneObjects\SkyboxRenderItem.cpp" />
+    <ClCompile Include="Source\Dx11Renderer.cpp" />
     <ClCompile Include="Source\main.cpp" />
-    <ClCompile Include="Source\\Mesh.cpp" />
+    <ClCompile Include="Source\Mesh.cpp" />
+    <ClCompile Include="Source\TextureLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Shaders\skybox_ps.hlsl" />
+    <None Include="Shaders\skybox_vs.hlsl" />
     <None Include="Shaders\triangle_ps.hlsl" />
     <None Include="Shaders\triangle_vs.hlsl" />
   </ItemGroup>
@@ -171,7 +177,4 @@
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
-
-
-
 

@@ -15,8 +15,8 @@
 #include <memory>
 #include <vector>
 
-#include "ObjectInterfaces/AutoRotatable.h"
 #include "Camera.h"
+#include "ObjectInterfaces/AutoRotatable.h"
 
 using Microsoft::WRL::ComPtr;
 
@@ -39,9 +39,33 @@ public:
     void shutdown();
 
 private:
+    struct RenderAssets {
+        struct ShaderPass {
+            ComPtr<ID3D11VertexShader> vertexShader;
+            ComPtr<ID3D11PixelShader> pixelShader;
+            ComPtr<ID3D11InputLayout> inputLayout;
+            ComPtr<ID3D11DepthStencilState> depthStencilState;
+        };
+
+        struct TextureBinding {
+            ComPtr<ID3D11SamplerState> samplerState;
+            ComPtr<ID3D11Texture2D> texture;
+            ComPtr<ID3D11ShaderResourceView> textureView;
+        };
+
+        ShaderPass objectPass;
+        ShaderPass skyboxPass;
+        TextureBinding cubeTexture;
+        TextureBinding skyboxTexture;
+        ComPtr<ID3D11RasterizerState> rasterizerState;
+        ComPtr<ID3D11Buffer> objectBuffer;
+        ComPtr<ID3D11Buffer> sceneBuffer;
+    };
+
     bool createBackBufferTarget();
     bool createDepthResources();
     bool createPipelineResources();
+    bool createTextureResources();
     bool buildScene();
     void releaseRenderTargets();
     void releaseSceneResources();
@@ -52,12 +76,7 @@ private:
     ComPtr<ID3D11RenderTargetView> m_backBufferTarget;
     ComPtr<ID3D11Texture2D> m_depthBuffer;
     ComPtr<ID3D11DepthStencilView> m_depthTarget;
-    ComPtr<ID3D11VertexShader> m_vertexShader;
-    ComPtr<ID3D11PixelShader> m_pixelShader;
-    ComPtr<ID3D11InputLayout> m_vertexLayout;
-    ComPtr<ID3D11RasterizerState> m_rasterizerState;
-    ComPtr<ID3D11Buffer> m_objectBuffer;
-    ComPtr<ID3D11Buffer> m_sceneBuffer;
+    RenderAssets m_renderAssets;
     std::vector<std::shared_ptr<RenderItem>> m_renderItems;
     std::vector<std::shared_ptr<AutoRotatable>> m_autoRotatables;
     Camera m_camera;

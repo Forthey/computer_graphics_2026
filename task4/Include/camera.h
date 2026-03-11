@@ -17,6 +17,7 @@ public:
     void rotate(float deltaDirectionRadians, float deltaTiltRadians = 0.0f) override;
     DirectX::XMMATRIX buildViewMatrix() const;
     DirectX::XMMATRIX buildProjectionMatrix(float aspectRatio) const;
+    DirectX::XMFLOAT3 position() const;
     void moveLocal(float forwardDelta, float rightDelta);
     void move(float forwardDelta, float rightDelta, float upDelta = 0.0f) override;
 

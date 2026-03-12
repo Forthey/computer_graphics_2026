@@ -149,7 +149,8 @@ bool createCubemapResource(ID3D11Device* device, const std::array<TextureDescrip
     const std::uint32_t width = faceTextures[0].width;
     const std::uint32_t height = faceTextures[0].height;
     const std::uint32_t mipmapsCount = faceTextures[0].mipmapsCount;
-    if (width == 0u || height == 0u || mipmapsCount != 1u || faceTextures[0].subresources.size() != 1u) {
+    if (width == 0u || height == 0u || mipmapsCount == 0u ||
+        faceTextures[0].subresources.size() != mipmapsCount) {
         return false;
     }
 
@@ -160,20 +161,30 @@ bool createCubemapResource(ID3D11Device* device, const std::array<TextureDescrip
 
     for (const TextureDescription& faceTexture : faceTextures) {
         if (faceTexture.fmt != format || faceTexture.width != width || faceTexture.height != height ||
-            faceTexture.mipmapsCount != mipmapsCount || faceTexture.subresources.size() != 1u ||
-            faceTexture.subresources[0].rowPitch != faceTextures[0].subresources[0].rowPitch ||
-            faceTexture.subresources[0].slicePitch != faceTextures[0].subresources[0].slicePitch ||
-            faceTexture.data.size() < faceTexture.subresources[0].slicePitch) {
+            faceTexture.mipmapsCount != mipmapsCount || faceTexture.subresources.size() != mipmapsCount) {
             return false;
+        }
+
+        for (std::uint32_t mipIndex = 0; mipIndex < mipmapsCount; ++mipIndex) {
+            const TextureSubresourceLayout& referenceLayout = faceTextures[0].subresources[mipIndex];
+            const TextureSubresourceLayout& layout = faceTexture.subresources[mipIndex];
+            if (layout.rowPitch != referenceLayout.rowPitch || layout.slicePitch != referenceLayout.slicePitch ||
+                layout.dataOffset + layout.slicePitch > faceTexture.data.size()) {
+                return false;
+            }
         }
     }
 
-    std::array<D3D11_SUBRESOURCE_DATA, 6> subresources{};
+    std::vector<D3D11_SUBRESOURCE_DATA> subresources(static_cast<std::size_t>(faceTextures.size()) * mipmapsCount);
     for (std::size_t faceIndex = 0; faceIndex < faceTextures.size(); ++faceIndex) {
-        const TextureSubresourceLayout& layout = faceTextures[faceIndex].subresources[0];
-        subresources[faceIndex].pSysMem = faceTextures[faceIndex].data.data() + layout.dataOffset;
-        subresources[faceIndex].SysMemPitch = layout.rowPitch;
-        subresources[faceIndex].SysMemSlicePitch = layout.slicePitch;
+        for (std::uint32_t mipIndex = 0; mipIndex < mipmapsCount; ++mipIndex) {
+            const TextureSubresourceLayout& layout = faceTextures[faceIndex].subresources[mipIndex];
+            const std::size_t subresourceIndex = static_cast<std::size_t>(D3D11CalcSubresource(
+                mipIndex, static_cast<UINT>(faceIndex), mipmapsCount));
+            subresources[subresourceIndex].pSysMem = faceTextures[faceIndex].data.data() + layout.dataOffset;
+            subresources[subresourceIndex].SysMemPitch = layout.rowPitch;
+            subresources[subresourceIndex].SysMemSlicePitch = layout.slicePitch;
+        }
     }
 
     D3D11_TEXTURE2D_DESC desc{};
@@ -199,8 +210,7 @@ bool createCubemapResource(ID3D11Device* device, const std::array<TextureDescrip
     viewDesc.TextureCube.MostDetailedMip = 0;
     result = device->CreateShaderResourceView(cubemapTexture.Get(), &viewDesc, cubemapView.ReleaseAndGetAddressOf());
     return SUCCEEDED(result);
-}
-}  // namespace
+}}  // namespace
 
 Dx11Renderer::~Dx11Renderer() { shutdown(); }
 
@@ -632,15 +642,15 @@ bool Dx11Renderer::createPipelineResources() {
 
 bool Dx11Renderer::createTextureResources() {
     TextureDescription cubeTextureDescription;
-    if (!loadDDS(L"Assets\\cube_texture.dds", cubeTextureDescription) ||
+    if (!loadDDS(L"Assets\\cube\\active.dds", cubeTextureDescription) ||
         !createTexture2DResource(m_device.Get(), cubeTextureDescription, m_renderAssets.cubeTexture.texture,
                                  m_renderAssets.cubeTexture.textureView)) {
         return false;
     }
 
     const std::array<const wchar_t*, 6> cubemapFacePaths = {
-        L"Assets\\sky_posx.dds", L"Assets\\sky_negx.dds", L"Assets\\sky_posy.dds",
-        L"Assets\\sky_negy.dds", L"Assets\\sky_posz.dds", L"Assets\\sky_negz.dds",
+        L"Assets\\sky\\active\\px.dds", L"Assets\\sky\\active\\nx.dds", L"Assets\\sky\\active\\py.dds",
+        L"Assets\\sky\\active\\ny.dds", L"Assets\\sky\\active\\pz.dds", L"Assets\\sky\\active\\nz.dds",
     };
 
     std::array<TextureDescription, 6> cubemapFaces{};

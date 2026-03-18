@@ -58,6 +58,8 @@ private:
         TextureBinding cubeTexture;
         TextureBinding skyboxTexture;
         ComPtr<ID3D11RasterizerState> rasterizerState;
+        ComPtr<ID3D11BlendState> transparentBlendState;
+        ComPtr<ID3D11DepthStencilState> transparentDepthState;
         ComPtr<ID3D11Buffer> objectBuffer;
         ComPtr<ID3D11Buffer> sceneBuffer;
     };
@@ -85,3 +87,4 @@ private:
     std::uint32_t m_width = 0;
     std::uint32_t m_height = 0;
 };
+

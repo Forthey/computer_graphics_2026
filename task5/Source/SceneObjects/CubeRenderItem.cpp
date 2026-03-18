@@ -14,6 +14,8 @@ struct Vertex {
 
 CubeRenderItem::CubeRenderItem(ID3D11Device* device, const Params& params) {
     m_position = params.position;
+    m_colorTint = params.colorTint;
+    m_type = params.type;
     m_rotationSpeed = params.rotationSpeed;
     m_rotationAngle = params.rotationOffset;
 
@@ -56,7 +58,7 @@ CubeRenderItem::CubeRenderItem(ID3D11Device* device, const Params& params) {
                                              static_cast<std::uint32_t>(std::size(indices)));
 }
 
-RenderItemType CubeRenderItem::type() const { return RenderItemType::OpaqueTextured; }
+RenderItemType CubeRenderItem::type() const { return m_type; }
 
 const std::shared_ptr<Mesh>& CubeRenderItem::mesh() const { return m_mesh; }
 
@@ -65,6 +67,10 @@ DirectX::XMMATRIX CubeRenderItem::buildModelMatrix() const {
     const DirectX::XMMATRIX translation = DirectX::XMMatrixTranslation(m_position.x, m_position.y, m_position.z);
     return DirectX::XMMatrixMultiply(rotation, translation);
 }
+
+DirectX::XMFLOAT4 CubeRenderItem::colorTint() const { return m_colorTint; }
+
+DirectX::XMFLOAT3 CubeRenderItem::sortPosition() const { return m_position; }
 
 void CubeRenderItem::rotate(float deltaDirectionRadians, float /*deltaTiltRadians*/) {
     m_rotationAngle += deltaDirectionRadians;

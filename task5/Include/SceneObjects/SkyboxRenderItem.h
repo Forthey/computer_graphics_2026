@@ -24,6 +24,8 @@ public:
     RenderItemType type() const override;
     const std::shared_ptr<Mesh>& mesh() const override;
     DirectX::XMMATRIX buildModelMatrix() const override;
+    DirectX::XMFLOAT4 colorTint() const override;
+    DirectX::XMFLOAT3 sortPosition() const override;
 
 private:
     std::shared_ptr<Mesh> m_mesh;

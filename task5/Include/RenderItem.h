@@ -14,6 +14,7 @@
 
 enum class RenderItemType {
     OpaqueTextured,
+    TransparentTextured,
     Skybox,
 };
 
@@ -24,4 +25,6 @@ public:
     virtual RenderItemType type() const = 0;
     virtual const std::shared_ptr<Mesh>& mesh() const = 0;
     virtual DirectX::XMMATRIX buildModelMatrix() const = 0;
+    virtual DirectX::XMFLOAT4 colorTint() const = 0;
+    virtual DirectX::XMFLOAT3 sortPosition() const = 0;
 };

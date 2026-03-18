@@ -21,6 +21,8 @@ public:
         float rotationSpeed = 0.8f;
         float rotationOffset = 0.0f;
         DirectX::XMFLOAT3 position = {0.0f, 0.0f, 0.0f};
+        DirectX::XMFLOAT4 colorTint = {1.0f, 1.0f, 1.0f, 1.0f};
+        RenderItemType type = RenderItemType::OpaqueTextured;
     };
 
     CubeRenderItem(ID3D11Device* device, const Params& params);
@@ -28,6 +30,8 @@ public:
     RenderItemType type() const override;
     const std::shared_ptr<Mesh>& mesh() const override;
     DirectX::XMMATRIX buildModelMatrix() const override;
+    DirectX::XMFLOAT4 colorTint() const override;
+    DirectX::XMFLOAT3 sortPosition() const override;
     void rotate(float deltaDirectionRadians, float deltaTiltRadians = 0.0f) override;
     void updateRotation(std::chrono::duration<float> deltaTime) override;
     void toggleAutoRotation() override;
@@ -35,6 +39,8 @@ public:
 private:
     std::shared_ptr<Mesh> m_mesh;
     DirectX::XMFLOAT3 m_position = {0.0f, 0.0f, 0.0f};
+    DirectX::XMFLOAT4 m_colorTint = {1.0f, 1.0f, 1.0f, 1.0f};
+    RenderItemType m_type = RenderItemType::OpaqueTextured;
     float m_rotationSpeed = 0.8f;
     float m_rotationAngle = 0.0f;
     bool m_isAutoRotationEnabled = true;

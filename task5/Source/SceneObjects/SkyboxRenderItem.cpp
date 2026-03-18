@@ -38,3 +38,7 @@ const std::shared_ptr<Mesh>& SkyboxRenderItem::mesh() const { return m_mesh; }
 DirectX::XMMATRIX SkyboxRenderItem::buildModelMatrix() const {
     return DirectX::XMMatrixScaling(m_size, m_size, m_size);
 }
+
+DirectX::XMFLOAT4 SkyboxRenderItem::colorTint() const { return DirectX::XMFLOAT4{1.0f, 1.0f, 1.0f, 1.0f}; }
+
+DirectX::XMFLOAT3 SkyboxRenderItem::sortPosition() const { return DirectX::XMFLOAT3{0.0f, 0.0f, 0.0f}; }

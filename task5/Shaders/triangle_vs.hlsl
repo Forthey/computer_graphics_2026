@@ -1,5 +1,6 @@
 cbuffer ObjectBuffer : register(b0) {
     row_major float4x4 modelMatrix;
+    float4 colorTint;
 };
 
 cbuffer SceneBuffer : register(b1) {

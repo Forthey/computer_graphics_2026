@@ -34,6 +34,7 @@ constexpr float kClearDepthValue = 1.0f;
 
 struct ObjectBuffer {
     DirectX::XMFLOAT4X4 modelMatrix;
+    DirectX::XMFLOAT4 colorTint;
 };
 
 struct SceneBuffer {
@@ -353,6 +354,7 @@ void Dx11Renderer::renderFrame() {
 
     ID3D11Buffer* constantBuffers[] = {m_renderAssets.objectBuffer.Get(), m_renderAssets.sceneBuffer.Get()};
     m_context->VSSetConstantBuffers(0, 2, constantBuffers);
+    m_context->PSSetConstantBuffers(0, 2, constantBuffers);
 
     for (const std::shared_ptr<RenderItem>& renderItem : m_renderItems) {
         if (!renderItem) {
@@ -368,6 +370,7 @@ void Dx11Renderer::renderFrame() {
         ID3D11ShaderResourceView* textureView = nullptr;
         switch (renderItem->type()) {
             case RenderItemType::Skybox:
+                m_context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
                 m_context->OMSetDepthStencilState(m_renderAssets.skyboxPass.depthStencilState.Get(), 0);
                 m_context->IASetInputLayout(m_renderAssets.skyboxPass.inputLayout.Get());
                 m_context->VSSetShader(m_renderAssets.skyboxPass.vertexShader.Get(), nullptr, 0);
@@ -375,8 +378,18 @@ void Dx11Renderer::renderFrame() {
                 sampler = m_renderAssets.skyboxTexture.samplerState.Get();
                 textureView = m_renderAssets.skyboxTexture.textureView.Get();
                 break;
+            case RenderItemType::TransparentTextured:
+                m_context->OMSetBlendState(m_renderAssets.transparentBlendState.Get(), nullptr, 0xFFFFFFFF);
+                m_context->OMSetDepthStencilState(m_renderAssets.transparentDepthState.Get(), 0);
+                m_context->IASetInputLayout(m_renderAssets.objectPass.inputLayout.Get());
+                m_context->VSSetShader(m_renderAssets.objectPass.vertexShader.Get(), nullptr, 0);
+                m_context->PSSetShader(m_renderAssets.objectPass.pixelShader.Get(), nullptr, 0);
+                sampler = m_renderAssets.cubeTexture.samplerState.Get();
+                textureView = m_renderAssets.cubeTexture.textureView.Get();
+                break;
             case RenderItemType::OpaqueTextured:
             default:
+                m_context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
                 m_context->OMSetDepthStencilState(nullptr, 0);
                 m_context->IASetInputLayout(m_renderAssets.objectPass.inputLayout.Get());
                 m_context->VSSetShader(m_renderAssets.objectPass.vertexShader.Get(), nullptr, 0);
@@ -393,6 +406,7 @@ void Dx11Renderer::renderFrame() {
 
         ObjectBuffer objectBuffer{};
         DirectX::XMStoreFloat4x4(&objectBuffer.modelMatrix, renderItem->buildModelMatrix());
+        objectBuffer.colorTint = renderItem->colorTint();
         m_context->UpdateSubresource(m_renderAssets.objectBuffer.Get(), 0, nullptr, &objectBuffer, 0, 0);
 
         const std::uint32_t vertexStride = mesh->vertexStride();
@@ -406,6 +420,7 @@ void Dx11Renderer::renderFrame() {
 
     ID3D11ShaderResourceView* nullViews[] = {nullptr};
     m_context->PSSetShaderResources(0, 1, nullViews);
+    m_context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
     m_context->OMSetDepthStencilState(nullptr, 0);
 
     const HRESULT result = m_swapChain->Present(0, 0);
@@ -597,6 +612,30 @@ bool Dx11Renderer::createPipelineResources() {
         return false;
     }
 
+    D3D11_BLEND_DESC transparentBlendDesc{};
+    transparentBlendDesc.AlphaToCoverageEnable = FALSE;
+    transparentBlendDesc.IndependentBlendEnable = FALSE;
+    transparentBlendDesc.RenderTarget[0].BlendEnable = TRUE;
+    transparentBlendDesc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+    transparentBlendDesc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+    transparentBlendDesc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+    transparentBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+    transparentBlendDesc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+    transparentBlendDesc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+    transparentBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+    result = m_device->CreateBlendState(&transparentBlendDesc, m_renderAssets.transparentBlendState.GetAddressOf());
+    if (FAILED(result)) {
+        return false;
+    }
+
+    D3D11_DEPTH_STENCIL_DESC transparentDepthDesc{};
+    transparentDepthDesc.DepthEnable = TRUE;
+    transparentDepthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
+    transparentDepthDesc.DepthFunc = D3D11_COMPARISON_LESS;
+    result = m_device->CreateDepthStencilState(&transparentDepthDesc, m_renderAssets.transparentDepthState.GetAddressOf());
+    if (FAILED(result)) {
+        return false;
+    }
     D3D11_BUFFER_DESC objectBufferDesc{};
     objectBufferDesc.ByteWidth = static_cast<unsigned int>(sizeof(ObjectBuffer));
     objectBufferDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -701,11 +740,41 @@ bool Dx11Renderer::buildScene() {
         return false;
     }
 
+    CubeRenderItem::Params transparentNearCubeParams{};
+    transparentNearCubeParams.size = 1.4f;
+    transparentNearCubeParams.rotationSpeed = 0.35f;
+    transparentNearCubeParams.rotationOffset = 0.15f;
+    transparentNearCubeParams.position = DirectX::XMFLOAT3{-0.15f, 0.0f, 4.0f};
+    transparentNearCubeParams.colorTint = DirectX::XMFLOAT4{1.0f, 0.35f, 0.35f, 0.45f};
+    transparentNearCubeParams.type = RenderItemType::TransparentTextured;
+
+    auto transparentNearCube = std::make_shared<CubeRenderItem>(m_device.Get(), transparentNearCubeParams);
+    if (!transparentNearCube->mesh() || !transparentNearCube->mesh()->isValid()) {
+        return false;
+    }
+
+    CubeRenderItem::Params transparentFarCubeParams{};
+    transparentFarCubeParams.size = 1.6f;
+    transparentFarCubeParams.rotationSpeed = -0.25f;
+    transparentFarCubeParams.rotationOffset = -0.4f;
+    transparentFarCubeParams.position = DirectX::XMFLOAT3{0.35f, 0.0f, 5.8f};
+    transparentFarCubeParams.colorTint = DirectX::XMFLOAT4{0.35f, 0.7f, 1.0f, 0.35f};
+    transparentFarCubeParams.type = RenderItemType::TransparentTextured;
+
+    auto transparentFarCube = std::make_shared<CubeRenderItem>(m_device.Get(), transparentFarCubeParams);
+    if (!transparentFarCube->mesh() || !transparentFarCube->mesh()->isValid()) {
+        return false;
+    }
+
     m_renderItems.push_back(skybox);
     m_renderItems.push_back(leftCube);
     m_renderItems.push_back(rightCube);
+    m_renderItems.push_back(transparentNearCube);
+    m_renderItems.push_back(transparentFarCube);
     m_autoRotatables.push_back(leftCube);
     m_autoRotatables.push_back(rightCube);
+    m_autoRotatables.push_back(transparentNearCube);
+    m_autoRotatables.push_back(transparentFarCube);
     return true;
 }
 
@@ -731,6 +800,8 @@ void Dx11Renderer::releaseSceneResources() {
     m_renderAssets.cubeTexture.samplerState.Reset();
     m_renderAssets.sceneBuffer.Reset();
     m_renderAssets.objectBuffer.Reset();
+    m_renderAssets.transparentDepthState.Reset();
+    m_renderAssets.transparentBlendState.Reset();
     m_renderAssets.skyboxPass.depthStencilState.Reset();
     m_renderAssets.rasterizerState.Reset();
     m_renderAssets.skyboxPass.inputLayout.Reset();
@@ -740,6 +811,11 @@ void Dx11Renderer::releaseSceneResources() {
     m_renderAssets.objectPass.pixelShader.Reset();
     m_renderAssets.objectPass.vertexShader.Reset();
 }
+
+
+
+
+
 
 
 

@@ -652,7 +652,7 @@ bool Dx11Renderer::createPipelineResources() {
     }
 
     D3D11_DEPTH_STENCIL_DESC skyboxDepthDesc{};
-    skyboxDepthDesc.DepthEnable = FALSE;
+    skyboxDepthDesc.DepthEnable = TRUE;
     skyboxDepthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
     skyboxDepthDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
     result =
@@ -860,6 +860,7 @@ void Dx11Renderer::releaseSceneResources() {
     m_renderAssets.objectPass.pixelShader.Reset();
     m_renderAssets.objectPass.vertexShader.Reset();
 }
+
 
 
 

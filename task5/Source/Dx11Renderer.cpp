@@ -12,6 +12,7 @@
 #pragma warning(pop)
 #endif
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <cwchar>
@@ -356,6 +357,13 @@ void Dx11Renderer::renderFrame() {
     m_context->VSSetConstantBuffers(0, 2, constantBuffers);
     m_context->PSSetConstantBuffers(0, 2, constantBuffers);
 
+    std::vector<const RenderItem*> opaqueItems;
+    std::vector<const RenderItem*> transparentItems;
+    std::vector<const RenderItem*> skyboxItems;
+    opaqueItems.reserve(m_renderItems.size());
+    transparentItems.reserve(m_renderItems.size());
+    skyboxItems.reserve(1);
+
     for (const std::shared_ptr<RenderItem>& renderItem : m_renderItems) {
         if (!renderItem) {
             continue;
@@ -365,6 +373,36 @@ void Dx11Renderer::renderFrame() {
         if (!mesh || !mesh->isValid()) {
             continue;
         }
+
+        switch (renderItem->type()) {
+            case RenderItemType::TransparentTextured:
+                transparentItems.push_back(renderItem.get());
+                break;
+            case RenderItemType::Skybox:
+                skyboxItems.push_back(renderItem.get());
+                break;
+            case RenderItemType::OpaqueTextured:
+            default:
+                opaqueItems.push_back(renderItem.get());
+                break;
+        }
+    }
+
+    const auto distanceSquaredToCamera = [&cameraPosition](const RenderItem* renderItem) {
+        const DirectX::XMFLOAT3 position = renderItem->sortPosition();
+        const float dx = position.x - cameraPosition.x;
+        const float dy = position.y - cameraPosition.y;
+        const float dz = position.z - cameraPosition.z;
+        return dx * dx + dy * dy + dz * dz;
+    };
+
+    std::sort(transparentItems.begin(), transparentItems.end(),
+              [&distanceSquaredToCamera](const RenderItem* lhs, const RenderItem* rhs) {
+                  return distanceSquaredToCamera(lhs) > distanceSquaredToCamera(rhs);
+              });
+
+    const auto drawItem = [this](const RenderItem* renderItem) {
+        const std::shared_ptr<Mesh>& mesh = renderItem->mesh();
 
         ID3D11SamplerState* sampler = nullptr;
         ID3D11ShaderResourceView* textureView = nullptr;
@@ -414,8 +452,19 @@ void Dx11Renderer::renderFrame() {
         ID3D11Buffer* geometry[] = {mesh->vertexBuffer()};
         m_context->IASetVertexBuffers(0, 1, geometry, &vertexStride, &startOffset);
         m_context->IASetIndexBuffer(mesh->indexBuffer(), mesh->indexFormat(), 0);
-
         m_context->DrawIndexed(mesh->indexCount(), 0, 0);
+    };
+
+    for (const RenderItem* renderItem : opaqueItems) {
+        drawItem(renderItem);
+    }
+
+    for (const RenderItem* renderItem : skyboxItems) {
+        drawItem(renderItem);
+    }
+
+    for (const RenderItem* renderItem : transparentItems) {
+        drawItem(renderItem);
     }
 
     ID3D11ShaderResourceView* nullViews[] = {nullptr};
@@ -605,7 +654,7 @@ bool Dx11Renderer::createPipelineResources() {
     D3D11_DEPTH_STENCIL_DESC skyboxDepthDesc{};
     skyboxDepthDesc.DepthEnable = FALSE;
     skyboxDepthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
-    skyboxDepthDesc.DepthFunc = D3D11_COMPARISON_ALWAYS;
+    skyboxDepthDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
     result =
         m_device->CreateDepthStencilState(&skyboxDepthDesc, m_renderAssets.skyboxPass.depthStencilState.GetAddressOf());
     if (FAILED(result)) {
@@ -811,6 +860,8 @@ void Dx11Renderer::releaseSceneResources() {
     m_renderAssets.objectPass.pixelShader.Reset();
     m_renderAssets.objectPass.vertexShader.Reset();
 }
+
+
 
 
 

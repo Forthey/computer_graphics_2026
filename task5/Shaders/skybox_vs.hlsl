@@ -21,6 +21,7 @@ VSOutput main(VSInput input) {
     float4 scaledPosition = mul(float4(input.position, 0.0f), modelMatrix);
     float4 worldPosition = float4(cameraPosition.xyz + scaledPosition.xyz, 1.0f);
     output.position = mul(worldPosition, viewProjectionMatrix);
+    output.position.z = output.position.w;
     output.direction = normalize(input.position);
     return output;
 }

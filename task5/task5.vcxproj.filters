@@ -24,34 +24,90 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Include\app.h"><Filter>Include</Filter></ClInclude>
-    <ClInclude Include="Include\ObjectInterfaces\AutoRotatable.h"><Filter>Include\ObjectInterfaces</Filter></ClInclude>
-    <ClInclude Include="Include\Camera.h"><Filter>Include</Filter></ClInclude>
-    <ClInclude Include="Include\ObjectInterfaces\Movable.h"><Filter>Include\ObjectInterfaces</Filter></ClInclude>
-    <ClInclude Include="Include\SceneObjects\CubeRenderItem.h"><Filter>Include\SceneObjects</Filter></ClInclude>
-    <ClInclude Include="Include\SceneObjects\SkyboxRenderItem.h"><Filter>Include\SceneObjects</Filter></ClInclude>
-    <ClInclude Include="Include\Dx11Renderer.h"><Filter>Include</Filter></ClInclude>
-    <ClInclude Include="Include\framework.h"><Filter>Include</Filter></ClInclude>
-    <ClInclude Include="Include\Mesh.h"><Filter>Include</Filter></ClInclude>
-    <ClInclude Include="Include\ObjectInterfaces\Rotatable.h"><Filter>Include\ObjectInterfaces</Filter></ClInclude>
-    <ClInclude Include="Include\RenderItem.h"><Filter>Include</Filter></ClInclude>
-    <ClInclude Include="Include\targetver.h"><Filter>Include</Filter></ClInclude>
-    <ClInclude Include="Include\TextureLoader.h"><Filter>Include</Filter></ClInclude>
+    <ClInclude Include="Include\app.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\ObjectInterfaces\AutoRotatable.h">
+      <Filter>Include\ObjectInterfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Camera.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\ObjectInterfaces\Movable.h">
+      <Filter>Include\ObjectInterfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\SceneObjects\CubeRenderItem.h">
+      <Filter>Include\SceneObjects</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\SceneObjects\SkyboxRenderItem.h">
+      <Filter>Include\SceneObjects</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Dx11Renderer.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\framework.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\Mesh.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\ObjectInterfaces\Rotatable.h">
+      <Filter>Include\ObjectInterfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\RenderItem.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\targetver.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\TextureLoader.h">
+      <Filter>Include</Filter>
+    </ClInclude>
+    <ClInclude Include="Include\AppController.h">
+      <Filter>Include</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source\app.cpp"><Filter>Source</Filter></ClCompile>
-    <ClCompile Include="Source\Camera.cpp"><Filter>Source</Filter></ClCompile>
-    <ClCompile Include="Source\SceneObjects\CubeRenderItem.cpp"><Filter>Source\SceneObjects</Filter></ClCompile>
-    <ClCompile Include="Source\SceneObjects\SkyboxRenderItem.cpp"><Filter>Source\SceneObjects</Filter></ClCompile>
-    <ClCompile Include="Source\Dx11Renderer.cpp"><Filter>Source</Filter></ClCompile>
-    <ClCompile Include="Source\main.cpp"><Filter>Source</Filter></ClCompile>
-    <ClCompile Include="Source\Mesh.cpp"><Filter>Source</Filter></ClCompile>
-    <ClCompile Include="Source\TextureLoader.cpp"><Filter>Source</Filter></ClCompile>
+    <ClCompile Include="Source\app.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Camera.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\SceneObjects\CubeRenderItem.cpp">
+      <Filter>Source\SceneObjects</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\SceneObjects\SkyboxRenderItem.cpp">
+      <Filter>Source\SceneObjects</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Dx11Renderer.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\main.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Mesh.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\TextureLoader.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\AppController.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shaders\skybox_ps.hlsl"><Filter>Shaders</Filter></None>
-    <None Include="Shaders\skybox_vs.hlsl"><Filter>Shaders</Filter></None>
-    <None Include="Shaders\triangle_ps.hlsl"><Filter>Shaders</Filter></None>
-    <None Include="Shaders\triangle_vs.hlsl"><Filter>Shaders</Filter></None>
+    <None Include="Shaders\skybox_ps.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\skybox_vs.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\triangle_ps.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\triangle_vs.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

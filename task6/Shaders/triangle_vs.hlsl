@@ -1,11 +1,21 @@
+struct PointLight {
+    float4 position;
+    float4 color;
+};
+
 cbuffer ObjectBuffer : register(b0) {
     row_major float4x4 modelMatrix;
+    row_major float4x4 normalMatrix;
     float4 colorTint;
+    float4 materialParams;
 };
 
 cbuffer SceneBuffer : register(b1) {
     row_major float4x4 viewProjectionMatrix;
     float4 cameraPosition;
+    uint4 lightCount;
+    PointLight lights[10];
+    float4 ambientColor;
 };
 
 struct VSInput {
@@ -28,8 +38,8 @@ VSOutput main(VSInput input) {
     const float4 worldPosition = mul(float4(input.position, 1.0f), modelMatrix);
     output.position = mul(worldPosition, viewProjectionMatrix);
     output.worldPosition = worldPosition.xyz;
-    output.worldTangent = mul(float4(input.tangent, 0.0f), modelMatrix).xyz;
-    output.worldNormal = mul(float4(input.normal, 0.0f), modelMatrix).xyz;
+    output.worldTangent = mul(float4(input.tangent, 0.0f), normalMatrix).xyz;
+    output.worldNormal = mul(float4(input.normal, 0.0f), normalMatrix).xyz;
     output.uv = input.uv;
     return output;
 }

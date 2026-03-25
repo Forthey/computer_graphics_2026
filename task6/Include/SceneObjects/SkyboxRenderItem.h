@@ -25,6 +25,7 @@ public:
     const std::shared_ptr<Mesh>& mesh() const override;
     DirectX::XMMATRIX buildModelMatrix() const override;
     DirectX::XMFLOAT4 colorTint() const override;
+    float shininess() const override;
     DirectX::XMFLOAT3 sortPosition() const override;
 
 private:

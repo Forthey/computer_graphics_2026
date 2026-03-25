@@ -20,6 +20,7 @@ CubeRenderItem::CubeRenderItem(ID3D11Device* device, const Params& params) {
     m_type = params.type;
     m_rotationSpeed = params.rotationSpeed;
     m_rotationAngle = params.rotationOffset;
+    m_shininess = params.shininess;
 
     const float halfSize = (std::max)(kMinCubeSize, params.size * 0.5f);
 
@@ -72,6 +73,8 @@ DirectX::XMMATRIX CubeRenderItem::buildModelMatrix() const {
 
 DirectX::XMFLOAT4 CubeRenderItem::colorTint() const { return m_colorTint; }
 
+float CubeRenderItem::shininess() const { return m_shininess; }
+
 DirectX::XMFLOAT3 CubeRenderItem::sortPosition() const { return m_position; }
 
 void CubeRenderItem::rotate(float deltaDirectionRadians, float /*deltaTiltRadians*/) {
@@ -87,3 +90,5 @@ void CubeRenderItem::updateRotation(std::chrono::duration<float> deltaTime) {
 }
 
 void CubeRenderItem::toggleAutoRotation() { m_isAutoRotationEnabled = !m_isAutoRotationEnabled; }
+
+

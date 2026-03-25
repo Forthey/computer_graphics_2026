@@ -28,20 +28,47 @@
 namespace {
 constexpr std::uint32_t kSwapChainBufferCount = 2;
 constexpr std::uint32_t kSampleCount = 1;
+constexpr std::uint32_t kMaxPointLights = 10;
 constexpr float kClearColor[4] = {0.02f, 0.04f, 0.08f, 1.0f};
 constexpr float kViewportMinDepth = 0.0f;
 constexpr float kViewportMaxDepth = 1.0f;
 constexpr float kClearDepthValue = 1.0f;
 
+struct PointLight {
+    DirectX::XMFLOAT4 position;
+    DirectX::XMFLOAT4 color;
+};
+
 struct ObjectBuffer {
     DirectX::XMFLOAT4X4 modelMatrix;
+    DirectX::XMFLOAT4X4 normalMatrix;
     DirectX::XMFLOAT4 colorTint;
+    DirectX::XMFLOAT4 materialParams;
 };
 
 struct SceneBuffer {
     DirectX::XMFLOAT4X4 viewProjectionMatrix;
     DirectX::XMFLOAT4 cameraPosition;
+    DirectX::XMUINT4 lightCount;
+    PointLight lights[kMaxPointLights];
+    DirectX::XMFLOAT4 ambientColor;
 };
+
+DirectX::XMMATRIX buildNormalMatrix(const DirectX::XMMATRIX& modelMatrix) {
+    return DirectX::XMMatrixTranspose(DirectX::XMMatrixInverse(nullptr, modelMatrix));
+}
+
+void fillSceneLighting(SceneBuffer& sceneBuffer) {
+    sceneBuffer.lightCount = DirectX::XMUINT4{3u, 0u, 0u, 0u};
+    sceneBuffer.ambientColor = DirectX::XMFLOAT4{0.08f, 0.08f, 0.1f, 1.0f};
+    sceneBuffer.lights[0] = {DirectX::XMFLOAT4{-2.0f, 1.8f, 2.0f, 1.0f}, DirectX::XMFLOAT4{1.0f, 0.85f, 0.72f, 1.0f}};
+    sceneBuffer.lights[1] = {DirectX::XMFLOAT4{2.4f, 1.2f, 4.4f, 1.0f}, DirectX::XMFLOAT4{0.45f, 0.75f, 1.0f, 1.0f}};
+    sceneBuffer.lights[2] = {DirectX::XMFLOAT4{0.0f, 3.0f, 6.0f, 1.0f}, DirectX::XMFLOAT4{0.35f, 0.35f, 0.45f, 1.0f}};
+
+    for (std::uint32_t lightIndex = 3; lightIndex < kMaxPointLights; ++lightIndex) {
+        sceneBuffer.lights[lightIndex] = {};
+    }
+}
 
 HRESULT compileShaderFromFile(const wchar_t* shaderPath, const char* entryPoint, const char* target,
                               ComPtr<ID3DBlob>& compiledCode) {
@@ -350,6 +377,7 @@ void Dx11Renderer::renderFrame() {
         auto* sceneBuffer = reinterpret_cast<SceneBuffer*>(mapped.pData);
         DirectX::XMStoreFloat4x4(&sceneBuffer->viewProjectionMatrix, viewProjectionMatrix);
         sceneBuffer->cameraPosition = DirectX::XMFLOAT4(cameraPosition.x, cameraPosition.y, cameraPosition.z, 1.0f);
+        fillSceneLighting(*sceneBuffer);
         m_context->Unmap(m_renderAssets.sceneBuffer.Get(), 0);
     }
 
@@ -442,9 +470,12 @@ void Dx11Renderer::renderFrame() {
         m_context->PSSetSamplers(0, 1, samplers);
         m_context->PSSetShaderResources(0, 1, textureViews);
 
+        const DirectX::XMMATRIX modelMatrix = renderItem->buildModelMatrix();
         ObjectBuffer objectBuffer{};
-        DirectX::XMStoreFloat4x4(&objectBuffer.modelMatrix, renderItem->buildModelMatrix());
+        DirectX::XMStoreFloat4x4(&objectBuffer.modelMatrix, modelMatrix);
+        DirectX::XMStoreFloat4x4(&objectBuffer.normalMatrix, buildNormalMatrix(modelMatrix));
         objectBuffer.colorTint = renderItem->colorTint();
+        objectBuffer.materialParams = DirectX::XMFLOAT4{renderItem->shininess(), 0.0f, 0.0f, 0.0f};
         m_context->UpdateSubresource(m_renderAssets.objectBuffer.Get(), 0, nullptr, &objectBuffer, 0, 0);
 
         const std::uint32_t vertexStride = mesh->vertexStride();
@@ -862,3 +893,5 @@ void Dx11Renderer::releaseSceneResources() {
     m_renderAssets.objectPass.pixelShader.Reset();
     m_renderAssets.objectPass.vertexShader.Reset();
 }
+
+

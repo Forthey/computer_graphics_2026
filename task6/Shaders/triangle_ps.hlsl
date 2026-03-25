@@ -1,6 +1,21 @@
+struct PointLight {
+    float4 position;
+    float4 color;
+};
+
 cbuffer ObjectBuffer : register(b0) {
     row_major float4x4 modelMatrix;
+    row_major float4x4 normalMatrix;
     float4 colorTint;
+    float4 materialParams;
+};
+
+cbuffer SceneBuffer : register(b1) {
+    row_major float4x4 viewProjectionMatrix;
+    float4 cameraPosition;
+    uint4 lightCount;
+    PointLight lights[10];
+    float4 ambientColor;
 };
 
 Texture2D colorTexture : register(t0);

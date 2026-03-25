@@ -10,17 +10,26 @@ cbuffer SceneBuffer : register(b1) {
 
 struct VSInput {
     float3 position : POSITION;
-    float2 uv : TEXCOORD;
+    float3 tangent : TANGENT;
+    float3 normal : NORMAL;
+    float2 uv : TEXCOORD0;
 };
 
 struct VSOutput {
     float4 position : SV_POSITION;
-    float2 uv : TEXCOORD;
+    float3 worldPosition : TEXCOORD0;
+    float3 worldTangent : TEXCOORD1;
+    float3 worldNormal : TEXCOORD2;
+    float2 uv : TEXCOORD3;
 };
 
 VSOutput main(VSInput input) {
     VSOutput output;
-    output.position = mul(mul(float4(input.position, 1.0f), modelMatrix), viewProjectionMatrix);
+    const float4 worldPosition = mul(float4(input.position, 1.0f), modelMatrix);
+    output.position = mul(worldPosition, viewProjectionMatrix);
+    output.worldPosition = worldPosition.xyz;
+    output.worldTangent = mul(float4(input.tangent, 0.0f), modelMatrix).xyz;
+    output.worldNormal = mul(float4(input.normal, 0.0f), modelMatrix).xyz;
     output.uv = input.uv;
     return output;
 }

@@ -8,6 +8,8 @@ constexpr float kMinCubeSize = 0.001f;
 
 struct Vertex {
     float position[3];
+    float tangent[3];
+    float normal[3];
     float uv[2];
 };
 }  // namespace
@@ -22,30 +24,30 @@ CubeRenderItem::CubeRenderItem(ID3D11Device* device, const Params& params) {
     const float halfSize = (std::max)(kMinCubeSize, params.size * 0.5f);
 
     const std::array<Vertex, 24> vertices = {
-        Vertex{{-halfSize, -halfSize, halfSize}, {0.0f, 1.0f}},
-        Vertex{{halfSize, -halfSize, halfSize}, {1.0f, 1.0f}},
-        Vertex{{halfSize, halfSize, halfSize}, {1.0f, 0.0f}},
-        Vertex{{-halfSize, halfSize, halfSize}, {0.0f, 0.0f}},
-        Vertex{{halfSize, -halfSize, -halfSize}, {0.0f, 1.0f}},
-        Vertex{{-halfSize, -halfSize, -halfSize}, {1.0f, 1.0f}},
-        Vertex{{-halfSize, halfSize, -halfSize}, {1.0f, 0.0f}},
-        Vertex{{halfSize, halfSize, -halfSize}, {0.0f, 0.0f}},
-        Vertex{{-halfSize, -halfSize, -halfSize}, {0.0f, 1.0f}},
-        Vertex{{-halfSize, -halfSize, halfSize}, {1.0f, 1.0f}},
-        Vertex{{-halfSize, halfSize, halfSize}, {1.0f, 0.0f}},
-        Vertex{{-halfSize, halfSize, -halfSize}, {0.0f, 0.0f}},
-        Vertex{{halfSize, -halfSize, halfSize}, {0.0f, 1.0f}},
-        Vertex{{halfSize, -halfSize, -halfSize}, {1.0f, 1.0f}},
-        Vertex{{halfSize, halfSize, -halfSize}, {1.0f, 0.0f}},
-        Vertex{{halfSize, halfSize, halfSize}, {0.0f, 0.0f}},
-        Vertex{{-halfSize, halfSize, halfSize}, {0.0f, 1.0f}},
-        Vertex{{halfSize, halfSize, halfSize}, {1.0f, 1.0f}},
-        Vertex{{halfSize, halfSize, -halfSize}, {1.0f, 0.0f}},
-        Vertex{{-halfSize, halfSize, -halfSize}, {0.0f, 0.0f}},
-        Vertex{{-halfSize, -halfSize, -halfSize}, {0.0f, 1.0f}},
-        Vertex{{halfSize, -halfSize, -halfSize}, {1.0f, 1.0f}},
-        Vertex{{halfSize, -halfSize, halfSize}, {1.0f, 0.0f}},
-        Vertex{{-halfSize, -halfSize, halfSize}, {0.0f, 0.0f}},
+        Vertex{{-halfSize, -halfSize, halfSize}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+        Vertex{{halfSize, -halfSize, halfSize}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+        Vertex{{halfSize, halfSize, halfSize}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+        Vertex{{-halfSize, halfSize, halfSize}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
+        Vertex{{halfSize, -halfSize, -halfSize}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
+        Vertex{{-halfSize, -halfSize, -halfSize}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},
+        Vertex{{-halfSize, halfSize, -halfSize}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
+        Vertex{{halfSize, halfSize, -halfSize}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}},
+        Vertex{{-halfSize, -halfSize, -halfSize}, {0.0f, 0.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+        Vertex{{-halfSize, -halfSize, halfSize}, {0.0f, 0.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+        Vertex{{-halfSize, halfSize, halfSize}, {0.0f, 0.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+        Vertex{{-halfSize, halfSize, -halfSize}, {0.0f, 0.0f, 1.0f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+        Vertex{{halfSize, -halfSize, halfSize}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+        Vertex{{halfSize, -halfSize, -halfSize}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+        Vertex{{halfSize, halfSize, -halfSize}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+        Vertex{{halfSize, halfSize, halfSize}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+        Vertex{{-halfSize, halfSize, halfSize}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+        Vertex{{halfSize, halfSize, halfSize}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+        Vertex{{halfSize, halfSize, -halfSize}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+        Vertex{{-halfSize, halfSize, -halfSize}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+        Vertex{{-halfSize, -halfSize, -halfSize}, {1.0f, 0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}},
+        Vertex{{halfSize, -halfSize, -halfSize}, {1.0f, 0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
+        Vertex{{halfSize, -halfSize, halfSize}, {1.0f, 0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
+        Vertex{{-halfSize, -halfSize, halfSize}, {1.0f, 0.0f, 0.0f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},
     };
 
     static constexpr std::uint16_t indices[] = {

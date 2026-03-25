@@ -621,10 +621,12 @@ bool Dx11Renderer::createPipelineResources() {
 
     D3D11_INPUT_ELEMENT_DESC objectVertexFormat[] = {
         {"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-        {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0},
+        {"TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 36, D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
 
-    result = m_device->CreateInputLayout(objectVertexFormat, 2, objectVertexCode->GetBufferPointer(),
+    result = m_device->CreateInputLayout(objectVertexFormat, 4, objectVertexCode->GetBufferPointer(),
                                          objectVertexCode->GetBufferSize(),
                                          m_renderAssets.objectPass.inputLayout.GetAddressOf());
     if (FAILED(result)) {
@@ -860,14 +862,3 @@ void Dx11Renderer::releaseSceneResources() {
     m_renderAssets.objectPass.pixelShader.Reset();
     m_renderAssets.objectPass.vertexShader.Reset();
 }
-
-
-
-
-
-
-
-
-
-
-

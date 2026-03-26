@@ -26,6 +26,7 @@ public:
     DirectX::XMMATRIX buildModelMatrix() const override;
     DirectX::XMFLOAT4 colorTint() const override;
     float shininess() const override;
+    bool useNormalMap() const override;
     DirectX::XMFLOAT3 sortPosition() const override;
 
 private:

@@ -43,6 +43,9 @@ DirectX::XMFLOAT4 SkyboxRenderItem::colorTint() const { return DirectX::XMFLOAT4
 
 float SkyboxRenderItem::shininess() const { return 0.0f; }
 
+bool SkyboxRenderItem::useNormalMap() const { return false; }
+
 DirectX::XMFLOAT3 SkyboxRenderItem::sortPosition() const { return DirectX::XMFLOAT3{0.0f, 0.0f, 0.0f}; }
+
 
 

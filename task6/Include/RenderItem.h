@@ -27,5 +27,6 @@ public:
     virtual DirectX::XMMATRIX buildModelMatrix() const = 0;
     virtual DirectX::XMFLOAT4 colorTint() const = 0;
     virtual float shininess() const = 0;
+    virtual bool useNormalMap() const = 0;
     virtual DirectX::XMFLOAT3 sortPosition() const = 0;
 };

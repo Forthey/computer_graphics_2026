@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cstddef>
 #include <cwchar>
 #include <memory>
 #include <vector>
@@ -61,9 +62,9 @@ DirectX::XMMATRIX buildNormalMatrix(const DirectX::XMMATRIX& modelMatrix) {
 void fillSceneLighting(SceneBuffer& sceneBuffer) {
     sceneBuffer.lightCount = DirectX::XMUINT4{3u, 0u, 0u, 0u};
     sceneBuffer.ambientColor = DirectX::XMFLOAT4{0.08f, 0.08f, 0.1f, 1.0f};
-    sceneBuffer.lights[0] = {DirectX::XMFLOAT4{-2.0f, 1.8f, 2.0f, 1.0f}, DirectX::XMFLOAT4{1.0f, 0.85f, 0.72f, 1.0f}};
-    sceneBuffer.lights[1] = {DirectX::XMFLOAT4{2.4f, 1.2f, 4.4f, 1.0f}, DirectX::XMFLOAT4{0.45f, 0.75f, 1.0f, 1.0f}};
-    sceneBuffer.lights[2] = {DirectX::XMFLOAT4{0.0f, 3.0f, 6.0f, 1.0f}, DirectX::XMFLOAT4{0.35f, 0.35f, 0.45f, 1.0f}};
+    sceneBuffer.lights[0] = {DirectX::XMFLOAT4{0.0f, 0.0f, 4.8f, 1.0f}, DirectX::XMFLOAT4{1.0f, 0.92f, 0.82f, 1.0f}};
+    sceneBuffer.lights[1] = {DirectX::XMFLOAT4{-3.6f, 0.0f, 4.8f, 1.0f}, DirectX::XMFLOAT4{0.75f, 0.84f, 1.0f, 1.0f}};
+    sceneBuffer.lights[2] = {DirectX::XMFLOAT4{3.6f, 0.0f, 4.8f, 1.0f}, DirectX::XMFLOAT4{1.0f, 0.76f, 0.7f, 1.0f}};
 
     for (std::uint32_t lightIndex = 3; lightIndex < kMaxPointLights; ++lightIndex) {
         sceneBuffer.lights[lightIndex] = {};
@@ -166,6 +167,24 @@ bool createTexture2DResource(ID3D11Device* device, const TextureDescription& tex
     viewDesc.Texture2D.MostDetailedMip = 0;
     result = device->CreateShaderResourceView(texture.Get(), &viewDesc, textureView.ReleaseAndGetAddressOf());
     return SUCCEEDED(result);
+}
+
+bool createFlatNormalTextureResource(ID3D11Device* device, ComPtr<ID3D11Texture2D>& texture,
+                                     ComPtr<ID3D11ShaderResourceView>& textureView) {
+    TextureDescription textureDescription{};
+    textureDescription.fmt = DXGI_FORMAT_R8G8B8A8_UNORM;
+    textureDescription.width = 1u;
+    textureDescription.height = 1u;
+    textureDescription.mipmapsCount = 1u;
+    textureDescription.subresources.push_back(TextureSubresourceLayout{1u, 1u, 4u, 4u, 0u});
+    textureDescription.data = {
+        std::byte{128},
+        std::byte{128},
+        std::byte{255},
+        std::byte{255},
+    };
+
+    return createTexture2DResource(device, textureDescription, texture, textureView);
 }
 
 bool createCubemapResource(ID3D11Device* device, const std::array<TextureDescription, 6>& faceTextures,
@@ -466,16 +485,20 @@ void Dx11Renderer::renderFrame() {
         }
 
         ID3D11SamplerState* samplers[] = {sampler};
-        ID3D11ShaderResourceView* textureViews[] = {textureView};
+        ID3D11ShaderResourceView* textureViews[] = {textureView, nullptr};
+        if (renderItem->type() != RenderItemType::Skybox) {
+            textureViews[1] = m_renderAssets.cubeNormalTexture.textureView.Get();
+        }
         m_context->PSSetSamplers(0, 1, samplers);
-        m_context->PSSetShaderResources(0, 1, textureViews);
+        m_context->PSSetShaderResources(0, 2, textureViews);
 
         const DirectX::XMMATRIX modelMatrix = renderItem->buildModelMatrix();
         ObjectBuffer objectBuffer{};
         DirectX::XMStoreFloat4x4(&objectBuffer.modelMatrix, modelMatrix);
         DirectX::XMStoreFloat4x4(&objectBuffer.normalMatrix, buildNormalMatrix(modelMatrix));
         objectBuffer.colorTint = renderItem->colorTint();
-        objectBuffer.materialParams = DirectX::XMFLOAT4{renderItem->shininess(), 0.0f, 0.0f, 0.0f};
+        objectBuffer.materialParams =
+            DirectX::XMFLOAT4{renderItem->shininess(), renderItem->useNormalMap() ? 1.0f : 0.0f, 0.0f, 0.0f};
         m_context->UpdateSubresource(m_renderAssets.objectBuffer.Get(), 0, nullptr, &objectBuffer, 0, 0);
 
         const std::uint32_t vertexStride = mesh->vertexStride();
@@ -498,8 +521,8 @@ void Dx11Renderer::renderFrame() {
         drawItem(renderItem);
     }
 
-    ID3D11ShaderResourceView* nullViews[] = {nullptr};
-    m_context->PSSetShaderResources(0, 1, nullViews);
+    ID3D11ShaderResourceView* nullViews[] = {nullptr, nullptr};
+    m_context->PSSetShaderResources(0, 2, nullViews);
     m_context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
     m_context->OMSetDepthStencilState(nullptr, 0);
 
@@ -752,6 +775,7 @@ bool Dx11Renderer::createPipelineResources() {
     if (FAILED(result)) {
         return false;
     }
+    m_renderAssets.cubeNormalTexture.samplerState = m_renderAssets.cubeTexture.samplerState;
 
     D3D11_SAMPLER_DESC clampSamplerDesc = wrapSamplerDesc;
     clampSamplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
@@ -766,6 +790,17 @@ bool Dx11Renderer::createTextureResources() {
     if (!loadDDS(L"Assets\\cube\\active.dds", cubeTextureDescription) ||
         !createTexture2DResource(m_device.Get(), cubeTextureDescription, m_renderAssets.cubeTexture.texture,
                                  m_renderAssets.cubeTexture.textureView)) {
+        return false;
+    }
+
+    TextureDescription cubeNormalTextureDescription;
+    if (loadDDS(L"Assets\\cube\\active_normal.dds", cubeNormalTextureDescription)) {
+        if (!createTexture2DResource(m_device.Get(), cubeNormalTextureDescription, m_renderAssets.cubeNormalTexture.texture,
+                                     m_renderAssets.cubeNormalTexture.textureView)) {
+            return false;
+        }
+    } else if (!createFlatNormalTextureResource(m_device.Get(), m_renderAssets.cubeNormalTexture.texture,
+                                                m_renderAssets.cubeNormalTexture.textureView)) {
         return false;
     }
 
@@ -800,63 +835,67 @@ bool Dx11Renderer::buildScene() {
         return false;
     }
 
-    CubeRenderItem::Params leftCubeParams{};
-    leftCubeParams.size = 1.0f;
-    leftCubeParams.rotationSpeed = 0.8f;
-    leftCubeParams.rotationOffset = 0.0f;
-    leftCubeParams.position = DirectX::XMFLOAT3{-1.35f, 0.0f, 2.5f};
+    CubeRenderItem::Params opaqueNormalParams{};
+    opaqueNormalParams.size = 1.05f;
+    opaqueNormalParams.rotationSpeed = 0.65f;
+    opaqueNormalParams.rotationOffset = 0.0f;
+    opaqueNormalParams.position = DirectX::XMFLOAT3{-1.8f, 0.0f, 4.8f};
+    opaqueNormalParams.useNormalMap = true;
 
-    auto leftCube = std::make_shared<CubeRenderItem>(m_device.Get(), leftCubeParams);
-    if (!leftCube->mesh() || !leftCube->mesh()->isValid()) {
+    auto opaqueNormalCube = std::make_shared<CubeRenderItem>(m_device.Get(), opaqueNormalParams);
+    if (!opaqueNormalCube->mesh() || !opaqueNormalCube->mesh()->isValid()) {
         return false;
     }
 
-    CubeRenderItem::Params rightCubeParams{};
-    rightCubeParams.size = 1.0f;
-    rightCubeParams.rotationSpeed = -0.55f;
-    rightCubeParams.rotationOffset = 0.65f;
-    rightCubeParams.position = DirectX::XMFLOAT3{1.35f, 0.0f, 5.5f};
+    CubeRenderItem::Params opaqueFlatParams{};
+    opaqueFlatParams.size = 1.05f;
+    opaqueFlatParams.rotationSpeed = -0.65f;
+    opaqueFlatParams.rotationOffset = 0.35f;
+    opaqueFlatParams.position = DirectX::XMFLOAT3{1.8f, 0.0f, 4.8f};
+    opaqueFlatParams.useNormalMap = false;
 
-    auto rightCube = std::make_shared<CubeRenderItem>(m_device.Get(), rightCubeParams);
-    if (!rightCube->mesh() || !rightCube->mesh()->isValid()) {
+    auto opaqueFlatCube = std::make_shared<CubeRenderItem>(m_device.Get(), opaqueFlatParams);
+    if (!opaqueFlatCube->mesh() || !opaqueFlatCube->mesh()->isValid()) {
         return false;
     }
 
-    CubeRenderItem::Params transparentNearCubeParams{};
-    transparentNearCubeParams.size = 1.4f;
-    transparentNearCubeParams.rotationSpeed = 0.35f;
-    transparentNearCubeParams.rotationOffset = 0.15f;
-    transparentNearCubeParams.position = DirectX::XMFLOAT3{-0.15f, 0.0f, 4.0f};
-    transparentNearCubeParams.colorTint = DirectX::XMFLOAT4{1.0f, 0.35f, 0.35f, 0.45f};
-    transparentNearCubeParams.type = RenderItemType::TransparentTextured;
+    CubeRenderItem::Params transparentNormalParams{};
+    transparentNormalParams.size = 1.25f;
+    transparentNormalParams.rotationSpeed = 0.3f;
+    transparentNormalParams.rotationOffset = 0.2f;
+    transparentNormalParams.position = DirectX::XMFLOAT3{0.0f, 0.0f, 3.2f};
+    transparentNormalParams.colorTint = DirectX::XMFLOAT4{1.0f, 0.45f, 0.45f, 0.42f};
+    transparentNormalParams.type = RenderItemType::TransparentTextured;
+    transparentNormalParams.useNormalMap = true;
 
-    auto transparentNearCube = std::make_shared<CubeRenderItem>(m_device.Get(), transparentNearCubeParams);
-    if (!transparentNearCube->mesh() || !transparentNearCube->mesh()->isValid()) {
+    auto transparentNormalCube = std::make_shared<CubeRenderItem>(m_device.Get(), transparentNormalParams);
+    if (!transparentNormalCube->mesh() || !transparentNormalCube->mesh()->isValid()) {
         return false;
     }
 
-    CubeRenderItem::Params transparentFarCubeParams{};
-    transparentFarCubeParams.size = 1.6f;
-    transparentFarCubeParams.rotationSpeed = -0.25f;
-    transparentFarCubeParams.rotationOffset = -0.4f;
-    transparentFarCubeParams.position = DirectX::XMFLOAT3{0.35f, 0.0f, 5.8f};
-    transparentFarCubeParams.colorTint = DirectX::XMFLOAT4{0.35f, 0.7f, 1.0f, 0.35f};
-    transparentFarCubeParams.type = RenderItemType::TransparentTextured;
+    CubeRenderItem::Params transparentFlatParams{};
+    transparentFlatParams.size = 1.25f;
+    transparentFlatParams.rotationSpeed = -0.3f;
+    transparentFlatParams.rotationOffset = -0.25f;
+    transparentFlatParams.position = DirectX::XMFLOAT3{0.0f, 0.0f, 6.4f};
+    transparentFlatParams.colorTint = DirectX::XMFLOAT4{0.45f, 0.75f, 1.0f, 0.38f};
+    transparentFlatParams.type = RenderItemType::TransparentTextured;
+    transparentFlatParams.useNormalMap = false;
 
-    auto transparentFarCube = std::make_shared<CubeRenderItem>(m_device.Get(), transparentFarCubeParams);
-    if (!transparentFarCube->mesh() || !transparentFarCube->mesh()->isValid()) {
+    auto transparentFlatCube = std::make_shared<CubeRenderItem>(m_device.Get(), transparentFlatParams);
+    if (!transparentFlatCube->mesh() || !transparentFlatCube->mesh()->isValid()) {
         return false;
     }
 
     m_renderItems.push_back(skybox);
-    m_renderItems.push_back(leftCube);
-    m_renderItems.push_back(rightCube);
-    m_renderItems.push_back(transparentNearCube);
-    m_renderItems.push_back(transparentFarCube);
-    m_autoRotatables.push_back(leftCube);
-    m_autoRotatables.push_back(rightCube);
-    m_autoRotatables.push_back(transparentNearCube);
-    m_autoRotatables.push_back(transparentFarCube);
+    m_renderItems.push_back(opaqueNormalCube);
+    m_renderItems.push_back(opaqueFlatCube);
+    m_renderItems.push_back(transparentNormalCube);
+    m_renderItems.push_back(transparentFlatCube);
+    m_autoRotatables.push_back(opaqueNormalCube);
+    m_autoRotatables.push_back(opaqueFlatCube);
+    m_autoRotatables.push_back(transparentNormalCube);
+    m_autoRotatables.push_back(transparentFlatCube);
     return true;
 }
 
@@ -876,9 +915,12 @@ void Dx11Renderer::releaseSceneResources() {
 
     m_renderAssets.skyboxTexture.textureView.Reset();
     m_renderAssets.skyboxTexture.texture.Reset();
+    m_renderAssets.cubeNormalTexture.textureView.Reset();
+    m_renderAssets.cubeNormalTexture.texture.Reset();
     m_renderAssets.cubeTexture.textureView.Reset();
     m_renderAssets.cubeTexture.texture.Reset();
     m_renderAssets.skyboxTexture.samplerState.Reset();
+    m_renderAssets.cubeNormalTexture.samplerState.Reset();
     m_renderAssets.cubeTexture.samplerState.Reset();
     m_renderAssets.sceneBuffer.Reset();
     m_renderAssets.objectBuffer.Reset();
@@ -893,5 +935,15 @@ void Dx11Renderer::releaseSceneResources() {
     m_renderAssets.objectPass.pixelShader.Reset();
     m_renderAssets.objectPass.vertexShader.Reset();
 }
+
+
+
+
+
+
+
+
+
+
 
 

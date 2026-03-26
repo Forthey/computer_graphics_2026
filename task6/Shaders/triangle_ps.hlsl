@@ -19,6 +19,7 @@ cbuffer SceneBuffer : register(b1) {
 };
 
 Texture2D colorTexture : register(t0);
+Texture2D normalMapTexture : register(t1);
 SamplerState colorSampler : register(s0);
 
 struct PSInput {
@@ -53,10 +54,22 @@ float3 computePointLight(float3 albedo, float3 normal, float3 worldPosition) {
     return litColor;
 }
 
+float3 sampleWorldNormal(PSInput input) {
+    const float3 normal = normalize(input.worldNormal);
+    if (materialParams.y < 0.5f) {
+        return normal;
+    }
+
+    const float3 tangent = normalize(input.worldTangent);
+    const float3 binormal = normalize(cross(normal, tangent));
+    const float3 localNormal = normalMapTexture.Sample(colorSampler, input.uv).xyz * 2.0f - float3(1.0f, 1.0f, 1.0f);
+    return normalize(localNormal.x * tangent + localNormal.y * binormal + localNormal.z * normal);
+}
+
 float4 main(PSInput input) : SV_TARGET {
     const float4 texel = colorTexture.Sample(colorSampler, input.uv);
     const float4 baseColor = texel * colorTint;
-    const float3 normal = normalize(input.worldNormal);
+    const float3 normal = sampleWorldNormal(input);
     const float3 finalColor = computePointLight(baseColor.xyz, normal, input.worldPosition);
     return float4(finalColor, baseColor.w);
 }

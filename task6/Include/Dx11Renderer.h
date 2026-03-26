@@ -56,6 +56,7 @@ private:
         ShaderPass objectPass;
         ShaderPass skyboxPass;
         TextureBinding cubeTexture;
+        TextureBinding cubeNormalTexture;
         TextureBinding skyboxTexture;
         ComPtr<ID3D11RasterizerState> rasterizerState;
         ComPtr<ID3D11BlendState> transparentBlendState;
@@ -87,4 +88,3 @@ private:
     std::uint32_t m_width = 0;
     std::uint32_t m_height = 0;
 };
-

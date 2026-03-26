@@ -21,6 +21,7 @@ public:
         float rotationSpeed = 0.8f;
         float rotationOffset = 0.0f;
         float shininess = 32.0f;
+        bool useNormalMap = true;
         DirectX::XMFLOAT3 position = {0.0f, 0.0f, 0.0f};
         DirectX::XMFLOAT4 colorTint = {1.0f, 1.0f, 1.0f, 1.0f};
         RenderItemType type = RenderItemType::OpaqueTextured;
@@ -33,6 +34,7 @@ public:
     DirectX::XMMATRIX buildModelMatrix() const override;
     DirectX::XMFLOAT4 colorTint() const override;
     float shininess() const override;
+    bool useNormalMap() const override;
     DirectX::XMFLOAT3 sortPosition() const override;
     void rotate(float deltaDirectionRadians, float deltaTiltRadians = 0.0f) override;
     void updateRotation(std::chrono::duration<float> deltaTime) override;
@@ -46,5 +48,6 @@ private:
     float m_rotationSpeed = 0.8f;
     float m_rotationAngle = 0.0f;
     float m_shininess = 32.0f;
+    bool m_useNormalMap = true;
     bool m_isAutoRotationEnabled = true;
 };

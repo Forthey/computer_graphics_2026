@@ -822,6 +822,7 @@ bool Dx11Renderer::createTextureResources() {
 
 bool Dx11Renderer::buildScene() {
     m_renderItems.clear();
+    m_opaqueCubeItems.clear();
     m_autoRotatables.clear();
 
     if (!createTextureResources()) {
@@ -835,30 +836,38 @@ bool Dx11Renderer::buildScene() {
         return false;
     }
 
-    CubeRenderItem::Params opaqueNormalParams{};
-    opaqueNormalParams.size = 1.05f;
-    opaqueNormalParams.rotationSpeed = 0.65f;
-    opaqueNormalParams.rotationOffset = 0.0f;
-    opaqueNormalParams.position = DirectX::XMFLOAT3{-1.8f, 0.0f, 4.8f};
-    opaqueNormalParams.useNormalMap = true;
+    constexpr int kOpaqueCubeRows = 4;
+    constexpr int kOpaqueCubeColumns = 5;
+    constexpr float kOpaqueCubeSpacingX = 1.9f;
+    constexpr float kOpaqueCubeSpacingY = 1.55f;
+    constexpr float kOpaqueCubeDepthStep = 1.7f;
 
-    auto opaqueNormalCube = std::make_shared<CubeRenderItem>(m_device.Get(), opaqueNormalParams);
-    if (!opaqueNormalCube->mesh() || !opaqueNormalCube->mesh()->isValid()) {
-        return false;
+    for (int row = 0; row < kOpaqueCubeRows; ++row) {
+        for (int column = 0; column < kOpaqueCubeColumns; ++column) {
+            CubeRenderItem::Params opaqueParams{};
+            opaqueParams.size = 0.95f;
+            opaqueParams.rotationSpeed = ((row + column) % 2 == 0) ? 0.55f : -0.55f;
+            opaqueParams.rotationOffset = static_cast<float>(row * kOpaqueCubeColumns + column) * 0.17f;
+            opaqueParams.position = DirectX::XMFLOAT3{
+                (static_cast<float>(column) - static_cast<float>(kOpaqueCubeColumns - 1) * 0.5f) * kOpaqueCubeSpacingX,
+                (static_cast<float>(kOpaqueCubeRows - 1) * 0.5f - static_cast<float>(row)) * kOpaqueCubeSpacingY,
+                5.0f + static_cast<float>(row) * kOpaqueCubeDepthStep};
+            opaqueParams.useNormalMap = ((row + column) % 3) != 1;
+            opaqueParams.textureIndex = static_cast<std::uint32_t>((row + column) % 2);
+            opaqueParams.colorTint = ((row + column) % 2 == 0)
+                                        ? DirectX::XMFLOAT4{1.0f, 1.0f, 1.0f, 1.0f}
+                                        : DirectX::XMFLOAT4{0.92f, 0.98f, 1.0f, 1.0f};
+
+            auto opaqueCube = std::make_shared<CubeRenderItem>(m_device.Get(), opaqueParams);
+            if (!opaqueCube->mesh() || !opaqueCube->mesh()->isValid()) {
+                return false;
+            }
+
+            m_opaqueCubeItems.push_back(opaqueCube);
+            m_renderItems.push_back(opaqueCube);
+            m_autoRotatables.push_back(opaqueCube);
+        }
     }
-
-    CubeRenderItem::Params opaqueFlatParams{};
-    opaqueFlatParams.size = 1.05f;
-    opaqueFlatParams.rotationSpeed = -0.65f;
-    opaqueFlatParams.rotationOffset = 0.35f;
-    opaqueFlatParams.position = DirectX::XMFLOAT3{1.8f, 0.0f, 4.8f};
-    opaqueFlatParams.useNormalMap = false;
-
-    auto opaqueFlatCube = std::make_shared<CubeRenderItem>(m_device.Get(), opaqueFlatParams);
-    if (!opaqueFlatCube->mesh() || !opaqueFlatCube->mesh()->isValid()) {
-        return false;
-    }
-
     CubeRenderItem::Params transparentNormalParams{};
     transparentNormalParams.size = 1.25f;
     transparentNormalParams.rotationSpeed = 0.3f;
@@ -888,12 +897,8 @@ bool Dx11Renderer::buildScene() {
     }
 
     m_renderItems.push_back(skybox);
-    m_renderItems.push_back(opaqueNormalCube);
-    m_renderItems.push_back(opaqueFlatCube);
     m_renderItems.push_back(transparentNormalCube);
     m_renderItems.push_back(transparentFlatCube);
-    m_autoRotatables.push_back(opaqueNormalCube);
-    m_autoRotatables.push_back(opaqueFlatCube);
     m_autoRotatables.push_back(transparentNormalCube);
     m_autoRotatables.push_back(transparentFlatCube);
     return true;
@@ -911,6 +916,7 @@ void Dx11Renderer::releaseRenderTargets() {
 
 void Dx11Renderer::releaseSceneResources() {
     m_renderItems.clear();
+    m_opaqueCubeItems.clear();
     m_autoRotatables.clear();
 
     m_renderAssets.skyboxTexture.textureView.Reset();
@@ -935,15 +941,4 @@ void Dx11Renderer::releaseSceneResources() {
     m_renderAssets.objectPass.pixelShader.Reset();
     m_renderAssets.objectPass.vertexShader.Reset();
 }
-
-
-
-
-
-
-
-
-
-
-
 

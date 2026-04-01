@@ -20,6 +20,7 @@
 
 using Microsoft::WRL::ComPtr;
 
+class CubeRenderItem;
 class RenderItem;
 
 class Dx11Renderer {
@@ -81,6 +82,7 @@ private:
     ComPtr<ID3D11DepthStencilView> m_depthTarget;
     RenderAssets m_renderAssets;
     std::vector<std::shared_ptr<RenderItem>> m_renderItems;
+    std::vector<std::shared_ptr<CubeRenderItem>> m_opaqueCubeItems;
     std::vector<std::shared_ptr<AutoRotatable>> m_autoRotatables;
     Camera m_camera;
     std::chrono::steady_clock::time_point m_lastFrameTime = {};

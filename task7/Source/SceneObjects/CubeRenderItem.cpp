@@ -5,6 +5,7 @@
 
 namespace {
 constexpr float kMinCubeSize = 0.001f;
+constexpr float kMaxRotatedHalfExtentFactor = 1.41421356f;
 
 struct Vertex {
     float position[3];
@@ -21,9 +22,11 @@ CubeRenderItem::CubeRenderItem(ID3D11Device* device, const Params& params) {
     m_rotationSpeed = params.rotationSpeed;
     m_rotationAngle = params.rotationOffset;
     m_shininess = params.shininess;
+    m_size = (std::max)(kMinCubeSize, params.size);
+    m_textureIndex = params.textureIndex;
     m_useNormalMap = params.useNormalMap;
 
-    const float halfSize = (std::max)(kMinCubeSize, params.size * 0.5f);
+    const float halfSize = m_size * 0.5f;
 
     const std::array<Vertex, 24> vertices = {
         Vertex{{-halfSize, -halfSize, halfSize}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
@@ -80,6 +83,22 @@ bool CubeRenderItem::useNormalMap() const { return m_useNormalMap; }
 
 DirectX::XMFLOAT3 CubeRenderItem::sortPosition() const { return m_position; }
 
+float CubeRenderItem::size() const { return m_size; }
+
+std::uint32_t CubeRenderItem::textureIndex() const { return m_textureIndex; }
+
+DirectX::XMFLOAT3 CubeRenderItem::boundsMin() const {
+    const float halfHeight = m_size * 0.5f;
+    const float halfWidth = halfHeight * kMaxRotatedHalfExtentFactor;
+    return DirectX::XMFLOAT3{m_position.x - halfWidth, m_position.y - halfHeight, m_position.z - halfWidth};
+}
+
+DirectX::XMFLOAT3 CubeRenderItem::boundsMax() const {
+    const float halfHeight = m_size * 0.5f;
+    const float halfWidth = halfHeight * kMaxRotatedHalfExtentFactor;
+    return DirectX::XMFLOAT3{m_position.x + halfWidth, m_position.y + halfHeight, m_position.z + halfWidth};
+}
+
 void CubeRenderItem::rotate(float deltaDirectionRadians, float /*deltaTiltRadians*/) {
     m_rotationAngle += deltaDirectionRadians;
 }
@@ -93,6 +112,3 @@ void CubeRenderItem::updateRotation(std::chrono::duration<float> deltaTime) {
 }
 
 void CubeRenderItem::toggleAutoRotation() { m_isAutoRotationEnabled = !m_isAutoRotationEnabled; }
-
-
-

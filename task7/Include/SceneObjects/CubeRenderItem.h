@@ -9,6 +9,7 @@
 #pragma warning(pop)
 #endif
 
+#include <cstdint>
 #include <memory>
 
 #include "ObjectInterfaces/AutoRotatable.h"
@@ -22,6 +23,7 @@ public:
         float rotationOffset = 0.0f;
         float shininess = 32.0f;
         bool useNormalMap = true;
+        std::uint32_t textureIndex = 0u;
         DirectX::XMFLOAT3 position = {0.0f, 0.0f, 0.0f};
         DirectX::XMFLOAT4 colorTint = {1.0f, 1.0f, 1.0f, 1.0f};
         RenderItemType type = RenderItemType::OpaqueTextured;
@@ -36,6 +38,10 @@ public:
     float shininess() const override;
     bool useNormalMap() const override;
     DirectX::XMFLOAT3 sortPosition() const override;
+    float size() const;
+    std::uint32_t textureIndex() const;
+    DirectX::XMFLOAT3 boundsMin() const;
+    DirectX::XMFLOAT3 boundsMax() const;
     void rotate(float deltaDirectionRadians, float deltaTiltRadians = 0.0f) override;
     void updateRotation(std::chrono::duration<float> deltaTime) override;
     void toggleAutoRotation() override;
@@ -48,6 +54,8 @@ private:
     float m_rotationSpeed = 0.8f;
     float m_rotationAngle = 0.0f;
     float m_shininess = 32.0f;
+    float m_size = 1.0f;
+    std::uint32_t m_textureIndex = 0u;
     bool m_useNormalMap = true;
     bool m_isAutoRotationEnabled = true;
 };

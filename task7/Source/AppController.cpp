@@ -1,13 +1,23 @@
 #include "AppController.h"
 
 #include <cstdint>
+#include <cwchar>
 
 namespace {
 constexpr float kKeyboardMoveSpeed = 3.0f;
 constexpr float kMouseSensitivity = 0.01f;
+constexpr float kFpsUpdateIntervalSeconds = 0.25f;
+constexpr wchar_t kBaseWindowTitle[] = L"task7 DirectX11";
 }
 
-bool AppController::initializeWindowResources(HWND window) { return m_renderer.initialize(window); }
+bool AppController::initializeWindowResources(HWND window) {
+    m_window = window;
+    m_fpsAccumulatedSeconds = 0.0f;
+    m_fpsFrameCount = 0u;
+    m_lastPublishedFps = 0u;
+    updateWindowTitle();
+    return m_renderer.initialize(window);
+}
 
 void AppController::updateAndRender(float deltaTimeSeconds) {
     const float forwardAxis = movementAxis(m_isMoveForwardPressed, m_isMoveBackwardPressed);
@@ -16,6 +26,15 @@ void AppController::updateAndRender(float deltaTimeSeconds) {
     m_renderer.moveCamera(forwardAxis * kKeyboardMoveSpeed * deltaTimeSeconds,
                           rightAxis * kKeyboardMoveSpeed * deltaTimeSeconds);
     m_renderer.renderFrame();
+
+    m_fpsAccumulatedSeconds += deltaTimeSeconds;
+    ++m_fpsFrameCount;
+    if (m_fpsAccumulatedSeconds >= kFpsUpdateIntervalSeconds) {
+        m_lastPublishedFps = static_cast<std::uint32_t>(static_cast<float>(m_fpsFrameCount) / m_fpsAccumulatedSeconds + 0.5f);
+        m_fpsAccumulatedSeconds = 0.0f;
+        m_fpsFrameCount = 0u;
+        updateWindowTitle();
+    }
 }
 
 LRESULT AppController::handleWindowMessage(HWND window, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -67,6 +86,16 @@ void AppController::resetMovementState() {
     m_isMoveBackwardPressed = false;
     m_isMoveLeftPressed = false;
     m_isMoveRightPressed = false;
+}
+
+void AppController::updateWindowTitle() {
+    if (m_window == nullptr) {
+        return;
+    }
+
+    wchar_t title[128]{};
+    swprintf_s(title, L"%s | FPS: %u", kBaseWindowTitle, m_lastPublishedFps);
+    SetWindowTextW(m_window, title);
 }
 
 LRESULT AppController::handleResize(WPARAM wParam, LPARAM lParam) {
@@ -156,3 +185,4 @@ void AppController::endMouseDrag() {
         ReleaseCapture();
     }
 }
+

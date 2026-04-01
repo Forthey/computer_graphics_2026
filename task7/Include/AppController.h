@@ -20,6 +20,7 @@ private:
     static float movementAxis(bool positiveDirectionPressed, bool negativeDirectionPressed);
 
     void resetMovementState();
+    void updateWindowTitle();
     LRESULT handleResize(WPARAM wParam, LPARAM lParam);
     LRESULT handlePaint(HWND window) const;
     LRESULT handleKeyDown(HWND window, UINT message, WPARAM wParam, LPARAM lParam);
@@ -29,6 +30,10 @@ private:
     void endMouseDrag();
 
     Dx11Renderer m_renderer;
+    HWND m_window = nullptr;
+    float m_fpsAccumulatedSeconds = 0.0f;
+    std::uint32_t m_fpsFrameCount = 0u;
+    std::uint32_t m_lastPublishedFps = 0u;
     bool m_isDragging = false;
     POINT m_lastMousePos{};
     bool m_isMoveForwardPressed = false;
@@ -36,4 +41,3 @@ private:
     bool m_isMoveLeftPressed = false;
     bool m_isMoveRightPressed = false;
 };
-

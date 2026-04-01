@@ -29,7 +29,7 @@ cbuffer OpaqueInstanceBuffer : register(b2) {
     OpaqueInstanceData opaqueInstances[64];
 };
 
-Texture2D colorTexture : register(t0);
+Texture2DArray colorTexture : register(t0);
 Texture2D normalMapTexture : register(t1);
 SamplerState colorSampler : register(s0);
 
@@ -88,7 +88,7 @@ float3 sampleWorldNormal(PSInput input, float4 activeMaterialParams) {
 float4 main(PSInput input) : SV_TARGET {
     const float4 activeColorTint = getColorTint(input);
     const float4 activeMaterialParams = getMaterialParams(input);
-    const float4 texel = colorTexture.Sample(colorSampler, input.uv);
+    const float4 texel = colorTexture.Sample(colorSampler, float3(input.uv, activeMaterialParams.z));
     const float4 baseColor = texel * activeColorTint;
     const float3 normal = sampleWorldNormal(input, activeMaterialParams);
     const float3 finalColor = computePointLight(baseColor.xyz, normal, input.worldPosition, activeMaterialParams.x);

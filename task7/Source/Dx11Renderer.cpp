@@ -3,6 +3,7 @@
 #ifdef _MSC_VER
 #pragma warning(push, 0)
 #endif
+#include <DirectXCollision.h>
 #include <DirectXMath.h>
 #include <d3d11.h>
 #include <d3d11sdklayers.h>
@@ -67,14 +68,37 @@ DirectX::XMMATRIX buildNormalMatrix(const DirectX::XMMATRIX& modelMatrix) {
     return DirectX::XMMatrixTranspose(DirectX::XMMatrixInverse(nullptr, modelMatrix));
 }
 
-void fillSceneLighting(SceneBuffer& sceneBuffer) {
-    sceneBuffer.lightCount = DirectX::XMUINT4{3u, 0u, 0u, 0u};
-    sceneBuffer.ambientColor = DirectX::XMFLOAT4{0.08f, 0.08f, 0.1f, 1.0f};
-    sceneBuffer.lights[0] = {DirectX::XMFLOAT4{0.0f, 0.0f, 4.8f, 1.0f}, DirectX::XMFLOAT4{1.0f, 0.92f, 0.82f, 1.0f}};
-    sceneBuffer.lights[1] = {DirectX::XMFLOAT4{-3.6f, 0.0f, 4.8f, 1.0f}, DirectX::XMFLOAT4{0.75f, 0.84f, 1.0f, 1.0f}};
-    sceneBuffer.lights[2] = {DirectX::XMFLOAT4{3.6f, 0.0f, 4.8f, 1.0f}, DirectX::XMFLOAT4{1.0f, 0.76f, 0.7f, 1.0f}};
+DirectX::BoundingFrustum buildWorldFrustum(const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix) {
+    DirectX::BoundingFrustum viewFrustum;
+    DirectX::BoundingFrustum::CreateFromMatrix(viewFrustum, projectionMatrix);
 
-    for (std::uint32_t lightIndex = 3; lightIndex < kMaxPointLights; ++lightIndex) {
+    DirectX::BoundingFrustum worldFrustum;
+    viewFrustum.Transform(worldFrustum, DirectX::XMMatrixInverse(nullptr, viewMatrix));
+    return worldFrustum;
+}
+
+DirectX::BoundingBox buildBoundingBox(const CubeRenderItem& renderItem) {
+    const DirectX::XMFLOAT3 boundsMin = renderItem.boundsMin();
+    const DirectX::XMFLOAT3 boundsMax = renderItem.boundsMax();
+
+    DirectX::BoundingBox boundingBox{};
+    boundingBox.Center = DirectX::XMFLOAT3{(boundsMin.x + boundsMax.x) * 0.5f, (boundsMin.y + boundsMax.y) * 0.5f,
+                                           (boundsMin.z + boundsMax.z) * 0.5f};
+    boundingBox.Extents = DirectX::XMFLOAT3{(boundsMax.x - boundsMin.x) * 0.5f, (boundsMax.y - boundsMin.y) * 0.5f,
+                                            (boundsMax.z - boundsMin.z) * 0.5f};
+    return boundingBox;
+}
+
+void fillSceneLighting(SceneBuffer& sceneBuffer) {
+    sceneBuffer.lightCount = DirectX::XMUINT4{5u, 0u, 0u, 0u};
+    sceneBuffer.ambientColor = DirectX::XMFLOAT4{0.07f, 0.07f, 0.09f, 1.0f};
+    sceneBuffer.lights[0] = {DirectX::XMFLOAT4{-4.8f, 1.25f, 3.9f, 1.0f}, DirectX::XMFLOAT4{1.0f, 0.90f, 0.82f, 1.0f}};
+    sceneBuffer.lights[1] = {DirectX::XMFLOAT4{4.8f, 1.25f, 3.9f, 1.0f}, DirectX::XMFLOAT4{0.82f, 0.90f, 1.0f, 1.0f}};
+    sceneBuffer.lights[2] = {DirectX::XMFLOAT4{-4.8f, 1.25f, 11.75f, 1.0f}, DirectX::XMFLOAT4{0.88f, 1.0f, 0.84f, 1.0f}};
+    sceneBuffer.lights[3] = {DirectX::XMFLOAT4{4.8f, 1.25f, 11.75f, 1.0f}, DirectX::XMFLOAT4{1.0f, 0.82f, 0.90f, 1.0f}};
+    sceneBuffer.lights[4] = {DirectX::XMFLOAT4{0.0f, 1.85f, 8.9f, 1.0f}, DirectX::XMFLOAT4{1.0f, 0.98f, 0.84f, 1.0f}};
+
+    for (std::uint32_t lightIndex = 5; lightIndex < kMaxPointLights; ++lightIndex) {
         sceneBuffer.lights[lightIndex] = {};
     }
 }
@@ -173,6 +197,77 @@ bool createTexture2DResource(ID3D11Device* device, const TextureDescription& tex
     viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
     viewDesc.Texture2D.MipLevels = textureDescription.mipmapsCount;
     viewDesc.Texture2D.MostDetailedMip = 0;
+    result = device->CreateShaderResourceView(texture.Get(), &viewDesc, textureView.ReleaseAndGetAddressOf());
+    return SUCCEEDED(result);
+}
+
+
+bool createTexture2DArrayResource(ID3D11Device* device, const std::vector<TextureDescription>& textureDescriptions,
+                                  ComPtr<ID3D11Texture2D>& texture, ComPtr<ID3D11ShaderResourceView>& textureView) {
+    if (device == nullptr || textureDescriptions.empty()) {
+        return false;
+    }
+
+    const TextureDescription& reference = textureDescriptions.front();
+    if (reference.width == 0u || reference.height == 0u || reference.mipmapsCount == 0u ||
+        reference.subresources.size() != reference.mipmapsCount || reference.data.empty()) {
+        return false;
+    }
+
+    if (isBlockCompressedFormat(reference.fmt) && ((reference.width % 4u) != 0u || (reference.height % 4u) != 0u)) {
+        OutputDebugStringW(L"BC-compressed texture arrays require width and height to be multiples of 4.\n");
+        return false;
+    }
+
+    std::vector<D3D11_SUBRESOURCE_DATA> subresources;
+    subresources.reserve(textureDescriptions.size() * reference.mipmapsCount);
+
+    for (const TextureDescription& textureDescription : textureDescriptions) {
+        if (textureDescription.fmt != reference.fmt || textureDescription.width != reference.width ||
+            textureDescription.height != reference.height || textureDescription.mipmapsCount != reference.mipmapsCount ||
+            textureDescription.subresources.size() != reference.mipmapsCount || textureDescription.data.empty()) {
+            return false;
+        }
+
+        for (std::uint32_t mipIndex = 0; mipIndex < reference.mipmapsCount; ++mipIndex) {
+            const TextureSubresourceLayout& referenceLayout = reference.subresources[mipIndex];
+            const TextureSubresourceLayout& layout = textureDescription.subresources[mipIndex];
+            if (layout.rowPitch != referenceLayout.rowPitch || layout.slicePitch != referenceLayout.slicePitch ||
+                layout.dataOffset + layout.slicePitch > textureDescription.data.size()) {
+                return false;
+            }
+
+            D3D11_SUBRESOURCE_DATA subresource{};
+            subresource.pSysMem = textureDescription.data.data() + layout.dataOffset;
+            subresource.SysMemPitch = layout.rowPitch;
+            subresource.SysMemSlicePitch = layout.slicePitch;
+            subresources.push_back(subresource);
+        }
+    }
+
+    D3D11_TEXTURE2D_DESC desc{};
+    desc.Width = reference.width;
+    desc.Height = reference.height;
+    desc.MipLevels = reference.mipmapsCount;
+    desc.ArraySize = static_cast<UINT>(textureDescriptions.size());
+    desc.Format = reference.fmt;
+    desc.SampleDesc.Count = 1;
+    desc.Usage = D3D11_USAGE_IMMUTABLE;
+    desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+    HRESULT result = device->CreateTexture2D(&desc, subresources.data(), texture.ReleaseAndGetAddressOf());
+    if (FAILED(result)) {
+        reportTextureCreationFailure(reference, result);
+        return false;
+    }
+
+    D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc{};
+    viewDesc.Format = desc.Format;
+    viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2DARRAY;
+    viewDesc.Texture2DArray.ArraySize = desc.ArraySize;
+    viewDesc.Texture2DArray.FirstArraySlice = 0;
+    viewDesc.Texture2DArray.MipLevels = desc.MipLevels;
+    viewDesc.Texture2DArray.MostDetailedMip = 0;
     result = device->CreateShaderResourceView(texture.Get(), &viewDesc, textureView.ReleaseAndGetAddressOf());
     return SUCCEEDED(result);
 }
@@ -395,6 +490,7 @@ void Dx11Renderer::renderFrame() {
     const float aspect = (m_height != 0) ? static_cast<float>(m_width) / static_cast<float>(m_height) : 1.0f;
     const DirectX::XMMATRIX projectionMatrix = m_camera.buildProjectionMatrix(aspect);
     const DirectX::XMMATRIX viewProjectionMatrix = DirectX::XMMatrixMultiply(viewMatrix, projectionMatrix);
+    const DirectX::BoundingFrustum worldFrustum = buildWorldFrustum(viewMatrix, projectionMatrix);
     const DirectX::XMFLOAT3 cameraPosition = m_camera.position();
 
     D3D11_MAPPED_SUBRESOURCE mapped{};
@@ -516,8 +612,22 @@ void Dx11Renderer::renderFrame() {
     };
 
     if (!m_opaqueCubeItems.empty()) {
-        const std::uint32_t opaqueInstanceCount =
-            static_cast<std::uint32_t>((std::min)(m_opaqueCubeItems.size(), static_cast<std::size_t>(kMaxOpaqueInstances)));
+        std::vector<const CubeRenderItem*> visibleOpaqueItems;
+        visibleOpaqueItems.reserve(m_opaqueCubeItems.size());
+
+        for (const std::shared_ptr<CubeRenderItem>& renderItem : m_opaqueCubeItems) {
+            if (!renderItem) {
+                continue;
+            }
+
+            const DirectX::BoundingBox boundingBox = buildBoundingBox(*renderItem);
+            if (worldFrustum.Contains(boundingBox) != DirectX::DISJOINT) {
+                visibleOpaqueItems.push_back(renderItem.get());
+            }
+        }
+
+        const std::uint32_t opaqueInstanceCount = static_cast<std::uint32_t>(
+            (std::min)(visibleOpaqueItems.size(), static_cast<std::size_t>(kMaxOpaqueInstances)));
         const std::shared_ptr<Mesh>& opaqueMesh = m_opaqueCubeItems.front()->mesh();
         if (opaqueInstanceCount > 0u && opaqueMesh && opaqueMesh->isValid()) {
             D3D11_MAPPED_SUBRESOURCE instanceMap{};
@@ -527,7 +637,7 @@ void Dx11Renderer::renderFrame() {
             if (SUCCEEDED(instanceMapResult)) {
                 auto* instanceBuffer = reinterpret_cast<OpaqueInstanceData*>(instanceMap.pData);
                 for (std::uint32_t instanceIndex = 0; instanceIndex < opaqueInstanceCount; ++instanceIndex) {
-                    const CubeRenderItem& renderItem = *m_opaqueCubeItems[instanceIndex];
+                    const CubeRenderItem& renderItem = *visibleOpaqueItems[instanceIndex];
                     const DirectX::XMMATRIX modelMatrix = renderItem.buildModelMatrix();
                     DirectX::XMStoreFloat4x4(&instanceBuffer[instanceIndex].modelMatrix, modelMatrix);
                     DirectX::XMStoreFloat4x4(&instanceBuffer[instanceIndex].normalMatrix, buildNormalMatrix(modelMatrix));
@@ -850,10 +960,11 @@ bool Dx11Renderer::createPipelineResources() {
 }
 
 bool Dx11Renderer::createTextureResources() {
-    TextureDescription cubeTextureDescription;
-    if (!loadDDS(L"Assets\\cube\\active.dds", cubeTextureDescription) ||
-        !createTexture2DResource(m_device.Get(), cubeTextureDescription, m_renderAssets.cubeTexture.texture,
-                                 m_renderAssets.cubeTexture.textureView)) {
+    std::vector<TextureDescription> cubeTextureDescriptions(2);
+    if (!loadDDS(L"Assets\\cube\\inst_brick.dds", cubeTextureDescriptions[0]) ||
+        !loadDDS(L"Assets\\cube\\inst_gravel.dds", cubeTextureDescriptions[1]) ||
+        !createTexture2DArrayResource(m_device.Get(), cubeTextureDescriptions, m_renderAssets.cubeTexture.texture,
+                                      m_renderAssets.cubeTexture.textureView)) {
         return false;
     }
 
@@ -900,11 +1011,11 @@ bool Dx11Renderer::buildScene() {
         return false;
     }
 
-    constexpr int kOpaqueCubeRows = 4;
+    constexpr int kOpaqueCubeRows = 5;
     constexpr int kOpaqueCubeColumns = 5;
     constexpr float kOpaqueCubeSpacingX = 1.9f;
-    constexpr float kOpaqueCubeSpacingY = 1.55f;
-    constexpr float kOpaqueCubeDepthStep = 1.7f;
+    constexpr float kOpaqueCubeSpacingZ = 2.15f;
+
 
     for (int row = 0; row < kOpaqueCubeRows; ++row) {
         for (int column = 0; column < kOpaqueCubeColumns; ++column) {
@@ -914,9 +1025,9 @@ bool Dx11Renderer::buildScene() {
             opaqueParams.rotationOffset = static_cast<float>(row * kOpaqueCubeColumns + column) * 0.17f;
             opaqueParams.position = DirectX::XMFLOAT3{
                 (static_cast<float>(column) - static_cast<float>(kOpaqueCubeColumns - 1) * 0.5f) * kOpaqueCubeSpacingX,
-                (static_cast<float>(kOpaqueCubeRows - 1) * 0.5f - static_cast<float>(row)) * kOpaqueCubeSpacingY,
-                5.0f + static_cast<float>(row) * kOpaqueCubeDepthStep};
-            opaqueParams.useNormalMap = ((row + column) % 3) != 1;
+                0.0f,
+                4.6f + static_cast<float>(row) * kOpaqueCubeSpacingZ};
+            opaqueParams.useNormalMap = true;
             opaqueParams.textureIndex = static_cast<std::uint32_t>((row + column) % 2);
             opaqueParams.colorTint = ((row + column) % 2 == 0)
                                         ? DirectX::XMFLOAT4{1.0f, 1.0f, 1.0f, 1.0f}
@@ -932,39 +1043,7 @@ bool Dx11Renderer::buildScene() {
             m_autoRotatables.push_back(opaqueCube);
         }
     }
-    CubeRenderItem::Params transparentNormalParams{};
-    transparentNormalParams.size = 1.25f;
-    transparentNormalParams.rotationSpeed = 0.3f;
-    transparentNormalParams.rotationOffset = 0.2f;
-    transparentNormalParams.position = DirectX::XMFLOAT3{0.0f, 0.0f, 3.2f};
-    transparentNormalParams.colorTint = DirectX::XMFLOAT4{1.0f, 0.45f, 0.45f, 0.42f};
-    transparentNormalParams.type = RenderItemType::TransparentTextured;
-    transparentNormalParams.useNormalMap = true;
-
-    auto transparentNormalCube = std::make_shared<CubeRenderItem>(m_device.Get(), transparentNormalParams);
-    if (!transparentNormalCube->mesh() || !transparentNormalCube->mesh()->isValid()) {
-        return false;
-    }
-
-    CubeRenderItem::Params transparentFlatParams{};
-    transparentFlatParams.size = 1.25f;
-    transparentFlatParams.rotationSpeed = -0.3f;
-    transparentFlatParams.rotationOffset = -0.25f;
-    transparentFlatParams.position = DirectX::XMFLOAT3{0.0f, 0.0f, 6.4f};
-    transparentFlatParams.colorTint = DirectX::XMFLOAT4{0.45f, 0.75f, 1.0f, 0.38f};
-    transparentFlatParams.type = RenderItemType::TransparentTextured;
-    transparentFlatParams.useNormalMap = false;
-
-    auto transparentFlatCube = std::make_shared<CubeRenderItem>(m_device.Get(), transparentFlatParams);
-    if (!transparentFlatCube->mesh() || !transparentFlatCube->mesh()->isValid()) {
-        return false;
-    }
-
     m_renderItems.push_back(skybox);
-    m_renderItems.push_back(transparentNormalCube);
-    m_renderItems.push_back(transparentFlatCube);
-    m_autoRotatables.push_back(transparentNormalCube);
-    m_autoRotatables.push_back(transparentFlatCube);
     return true;
 }
 
@@ -1006,4 +1085,18 @@ void Dx11Renderer::releaseSceneResources() {
     m_renderAssets.objectPass.pixelShader.Reset();
     m_renderAssets.objectPass.vertexShader.Reset();
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

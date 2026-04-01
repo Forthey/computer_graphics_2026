@@ -41,3 +41,4 @@ private:
     bool m_isMoveLeftPressed = false;
     bool m_isMoveRightPressed = false;
 };
+

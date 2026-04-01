@@ -12,3 +12,10 @@ Thumbs.db
 *.user
 *.userosscache
 *.sln.docstates
+
+# Visual Studio build output folders
+**/[Dd]ebug/
+**/[Rr]elease/
+**/x64/
+**/x86/
+**/Win32/

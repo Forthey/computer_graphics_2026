@@ -64,6 +64,10 @@ struct OpaqueInstanceData {
     DirectX::XMFLOAT4 materialParams;
 };
 
+struct PostProcessBuffer {
+    DirectX::XMUINT4 mode;
+};
+
 DirectX::XMMATRIX buildNormalMatrix(const DirectX::XMMATRIX& modelMatrix) {
     return DirectX::XMMatrixTranspose(DirectX::XMMatrixInverse(nullptr, modelMatrix));
 }
@@ -438,7 +442,7 @@ bool Dx11Renderer::initialize(HWND window) {
         return false;
     }
 
-    if (!createBackBufferTarget() || !createDepthResources() || !createPipelineResources() || !buildScene()) {
+    if (!createBackBufferTarget() || !createDepthResources() || !createSceneColorResources() || !createPipelineResources() || !buildScene()) {
         shutdown();
         return false;
     }
@@ -449,14 +453,15 @@ bool Dx11Renderer::initialize(HWND window) {
 }
 
 void Dx11Renderer::renderFrame() {
-    if (!m_context || !m_backBufferTarget || !m_depthTarget || !m_swapChain) {
+    if (!m_context || !m_backBufferTarget || !m_sceneColorTarget || !m_depthTarget || !m_swapChain ||
+        !m_renderAssets.postProcessTexture.textureView) {
         return;
     }
 
-    ID3D11RenderTargetView* targets[] = {m_backBufferTarget.Get()};
-    m_context->OMSetRenderTargets(1, targets, m_depthTarget.Get());
+    ID3D11RenderTargetView* sceneTargets[] = {m_sceneColorTarget.Get()};
+    m_context->OMSetRenderTargets(1, sceneTargets, m_depthTarget.Get());
 
-    m_context->ClearRenderTargetView(m_backBufferTarget.Get(), kClearColor);
+    m_context->ClearRenderTargetView(m_sceneColorTarget.Get(), kClearColor);
     m_context->ClearDepthStencilView(m_depthTarget.Get(), D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, kClearDepthValue, 0);
 
     D3D11_VIEWPORT viewport{};
@@ -505,7 +510,7 @@ void Dx11Renderer::renderFrame() {
     }
 
     ID3D11Buffer* constantBuffers[] = {m_renderAssets.objectBuffer.Get(), m_renderAssets.sceneBuffer.Get(),
-                                     m_renderAssets.opaqueInstanceBuffer.Get()};
+                                       m_renderAssets.opaqueInstanceBuffer.Get()};
     m_context->VSSetConstantBuffers(0, 3, constantBuffers);
     m_context->PSSetConstantBuffers(0, 3, constantBuffers);
 
@@ -676,6 +681,7 @@ void Dx11Renderer::renderFrame() {
             m_context->DrawIndexedInstanced(opaqueMesh->indexCount(), opaqueInstanceCount, 0, 0, 0);
         }
     }
+
     for (const RenderItem* renderItem : skyboxItems) {
         drawItem(renderItem);
     }
@@ -684,10 +690,33 @@ void Dx11Renderer::renderFrame() {
         drawItem(renderItem);
     }
 
-    ID3D11ShaderResourceView* nullViews[] = {nullptr, nullptr};
-    m_context->PSSetShaderResources(0, 2, nullViews);
+    ID3D11ShaderResourceView* nullSceneViews[] = {nullptr, nullptr};
+    m_context->PSSetShaderResources(0, 2, nullSceneViews);
     m_context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
     m_context->OMSetDepthStencilState(nullptr, 0);
+
+    ID3D11RenderTargetView* backBufferTargets[] = {m_backBufferTarget.Get()};
+    m_context->OMSetRenderTargets(1, backBufferTargets, nullptr);
+    m_context->ClearRenderTargetView(m_backBufferTarget.Get(), kClearColor);
+    m_context->IASetInputLayout(nullptr);
+    m_context->IASetIndexBuffer(nullptr, DXGI_FORMAT_UNKNOWN, 0);
+    m_context->VSSetShader(m_renderAssets.postProcessPass.vertexShader.Get(), nullptr, 0);
+    m_context->PSSetShader(m_renderAssets.postProcessPass.pixelShader.Get(), nullptr, 0);
+
+    PostProcessBuffer postProcessBuffer{};
+    postProcessBuffer.mode = DirectX::XMUINT4{static_cast<std::uint32_t>(m_postProcessMode), 0u, 0u, 0u};
+    m_context->UpdateSubresource(m_renderAssets.postProcessBuffer.Get(), 0, nullptr, &postProcessBuffer, 0, 0);
+    ID3D11Buffer* postProcessBuffers[] = {m_renderAssets.postProcessBuffer.Get()};
+    m_context->PSSetConstantBuffers(0, 1, postProcessBuffers);
+
+    ID3D11SamplerState* postProcessSamplers[] = {m_renderAssets.postProcessTexture.samplerState.Get()};
+    ID3D11ShaderResourceView* postProcessViews[] = {m_renderAssets.postProcessTexture.textureView.Get()};
+    m_context->PSSetSamplers(0, 1, postProcessSamplers);
+    m_context->PSSetShaderResources(0, 1, postProcessViews);
+    m_context->Draw(3, 0);
+
+    ID3D11ShaderResourceView* nullPostProcessViews[] = {nullptr};
+    m_context->PSSetShaderResources(0, 1, nullPostProcessViews);
 
     const HRESULT result = m_swapChain->Present(0, 0);
     assert(SUCCEEDED(result));
@@ -707,7 +736,7 @@ bool Dx11Renderer::resize(std::uint32_t width, std::uint32_t height) {
 
     m_width = width;
     m_height = height;
-    return createBackBufferTarget() && createDepthResources();
+    return createBackBufferTarget() && createDepthResources() && createSceneColorResources();
 }
 
 void Dx11Renderer::adjustCamera(float deltaDirection, float deltaTilt) {
@@ -721,6 +750,33 @@ void Dx11Renderer::toggleSceneAutoRotation() {
         if (autoRotatable) {
             autoRotatable->toggleAutoRotation();
         }
+    }
+}
+
+void Dx11Renderer::cyclePostProcessMode() {
+    switch (m_postProcessMode) {
+        case PostProcessMode::Original:
+            m_postProcessMode = PostProcessMode::Grayscale;
+            break;
+        case PostProcessMode::Grayscale:
+            m_postProcessMode = PostProcessMode::Sepia;
+            break;
+        case PostProcessMode::Sepia:
+        default:
+            m_postProcessMode = PostProcessMode::Original;
+            break;
+    }
+}
+
+const wchar_t* Dx11Renderer::postProcessModeName() const {
+    switch (m_postProcessMode) {
+        case PostProcessMode::Original:
+            return L"Original";
+        case PostProcessMode::Grayscale:
+            return L"Grayscale";
+        case PostProcessMode::Sepia:
+        default:
+            return L"Sepia";
     }
 }
 
@@ -786,11 +842,45 @@ bool Dx11Renderer::createDepthResources() {
     return SUCCEEDED(result);
 }
 
+bool Dx11Renderer::createSceneColorResources() {
+    D3D11_TEXTURE2D_DESC colorDesc{};
+    colorDesc.Width = m_width;
+    colorDesc.Height = m_height;
+    colorDesc.MipLevels = 1;
+    colorDesc.ArraySize = 1;
+    colorDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    colorDesc.SampleDesc.Count = kSampleCount;
+    colorDesc.Usage = D3D11_USAGE_DEFAULT;
+    colorDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+
+    HRESULT result = m_device->CreateTexture2D(&colorDesc, nullptr, m_renderAssets.postProcessTexture.texture.GetAddressOf());
+    if (FAILED(result)) {
+        return false;
+    }
+
+    result = m_device->CreateRenderTargetView(m_renderAssets.postProcessTexture.texture.Get(), nullptr,
+                                              m_sceneColorTarget.GetAddressOf());
+    if (FAILED(result)) {
+        return false;
+    }
+
+    D3D11_SHADER_RESOURCE_VIEW_DESC viewDesc{};
+    viewDesc.Format = colorDesc.Format;
+    viewDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    viewDesc.Texture2D.MostDetailedMip = 0;
+    viewDesc.Texture2D.MipLevels = 1;
+    result = m_device->CreateShaderResourceView(m_renderAssets.postProcessTexture.texture.Get(), &viewDesc,
+                                                m_renderAssets.postProcessTexture.textureView.GetAddressOf());
+    return SUCCEEDED(result);
+}
+
 bool Dx11Renderer::createPipelineResources() {
     ComPtr<ID3DBlob> objectVertexCode;
     ComPtr<ID3DBlob> objectPixelCode;
     ComPtr<ID3DBlob> skyboxVertexCode;
     ComPtr<ID3DBlob> skyboxPixelCode;
+    ComPtr<ID3DBlob> postProcessVertexCode;
+    ComPtr<ID3DBlob> postProcessPixelCode;
 
     HRESULT result = compileShaderFromFile(L"Shaders/triangle_vs.hlsl", "main", "vs_5_0", objectVertexCode);
     if (FAILED(result)) {
@@ -808,6 +898,16 @@ bool Dx11Renderer::createPipelineResources() {
     }
 
     result = compileShaderFromFile(L"Shaders/skybox_ps.hlsl", "main", "ps_5_0", skyboxPixelCode);
+    if (FAILED(result)) {
+        return false;
+    }
+
+    result = compileShaderFromFile(L"Shaders/postprocess_vs.hlsl", "main", "vs_5_0", postProcessVertexCode);
+    if (FAILED(result)) {
+        return false;
+    }
+
+    result = compileShaderFromFile(L"Shaders/postprocess_ps.hlsl", "main", "ps_5_0", postProcessPixelCode);
     if (FAILED(result)) {
         return false;
     }
@@ -832,6 +932,19 @@ bool Dx11Renderer::createPipelineResources() {
 
     result = m_device->CreatePixelShader(skyboxPixelCode->GetBufferPointer(), skyboxPixelCode->GetBufferSize(), nullptr,
                                          m_renderAssets.skyboxPass.pixelShader.GetAddressOf());
+    if (FAILED(result)) {
+        return false;
+    }
+
+    result = m_device->CreateVertexShader(postProcessVertexCode->GetBufferPointer(),
+                                          postProcessVertexCode->GetBufferSize(), nullptr,
+                                          m_renderAssets.postProcessPass.vertexShader.GetAddressOf());
+    if (FAILED(result)) {
+        return false;
+    }
+
+    result = m_device->CreatePixelShader(postProcessPixelCode->GetBufferPointer(), postProcessPixelCode->GetBufferSize(),
+                                         nullptr, m_renderAssets.postProcessPass.pixelShader.GetAddressOf());
     if (FAILED(result)) {
         return false;
     }
@@ -874,8 +987,7 @@ bool Dx11Renderer::createPipelineResources() {
     skyboxDepthDesc.DepthEnable = TRUE;
     skyboxDepthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
     skyboxDepthDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
-    result =
-        m_device->CreateDepthStencilState(&skyboxDepthDesc, m_renderAssets.skyboxPass.depthStencilState.GetAddressOf());
+    result = m_device->CreateDepthStencilState(&skyboxDepthDesc, m_renderAssets.skyboxPass.depthStencilState.GetAddressOf());
     if (FAILED(result)) {
         return false;
     }
@@ -904,6 +1016,7 @@ bool Dx11Renderer::createPipelineResources() {
     if (FAILED(result)) {
         return false;
     }
+
     D3D11_BUFFER_DESC objectBufferDesc{};
     objectBufferDesc.ByteWidth = static_cast<unsigned int>(sizeof(ObjectBuffer));
     objectBufferDesc.Usage = D3D11_USAGE_DEFAULT;
@@ -936,6 +1049,16 @@ bool Dx11Renderer::createPipelineResources() {
         return false;
     }
 
+    D3D11_BUFFER_DESC postProcessBufferDesc{};
+    postProcessBufferDesc.ByteWidth = static_cast<unsigned int>(sizeof(PostProcessBuffer));
+    postProcessBufferDesc.Usage = D3D11_USAGE_DEFAULT;
+    postProcessBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+
+    result = m_device->CreateBuffer(&postProcessBufferDesc, nullptr, m_renderAssets.postProcessBuffer.GetAddressOf());
+    if (FAILED(result)) {
+        return false;
+    }
+
     D3D11_SAMPLER_DESC wrapSamplerDesc{};
     wrapSamplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
     wrapSamplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
@@ -956,6 +1079,11 @@ bool Dx11Renderer::createPipelineResources() {
     clampSamplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
     clampSamplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
     result = m_device->CreateSamplerState(&clampSamplerDesc, m_renderAssets.skyboxTexture.samplerState.GetAddressOf());
+    if (FAILED(result)) {
+        return false;
+    }
+
+    result = m_device->CreateSamplerState(&clampSamplerDesc, m_renderAssets.postProcessTexture.samplerState.GetAddressOf());
     return SUCCEEDED(result);
 }
 
@@ -1052,6 +1180,9 @@ void Dx11Renderer::releaseRenderTargets() {
         m_context->OMSetRenderTargets(0, nullptr, nullptr);
     }
 
+    m_sceneColorTarget.Reset();
+    m_renderAssets.postProcessTexture.textureView.Reset();
+    m_renderAssets.postProcessTexture.texture.Reset();
     m_depthTarget.Reset();
     m_depthBuffer.Reset();
     m_backBufferTarget.Reset();
@@ -1068,16 +1199,20 @@ void Dx11Renderer::releaseSceneResources() {
     m_renderAssets.cubeNormalTexture.texture.Reset();
     m_renderAssets.cubeTexture.textureView.Reset();
     m_renderAssets.cubeTexture.texture.Reset();
+    m_renderAssets.postProcessTexture.samplerState.Reset();
     m_renderAssets.skyboxTexture.samplerState.Reset();
     m_renderAssets.cubeNormalTexture.samplerState.Reset();
     m_renderAssets.cubeTexture.samplerState.Reset();
     m_renderAssets.sceneBuffer.Reset();
     m_renderAssets.objectBuffer.Reset();
     m_renderAssets.opaqueInstanceBuffer.Reset();
+    m_renderAssets.postProcessBuffer.Reset();
     m_renderAssets.transparentDepthState.Reset();
     m_renderAssets.transparentBlendState.Reset();
     m_renderAssets.skyboxPass.depthStencilState.Reset();
     m_renderAssets.rasterizerState.Reset();
+    m_renderAssets.postProcessPass.pixelShader.Reset();
+    m_renderAssets.postProcessPass.vertexShader.Reset();
     m_renderAssets.skyboxPass.inputLayout.Reset();
     m_renderAssets.skyboxPass.pixelShader.Reset();
     m_renderAssets.skyboxPass.vertexShader.Reset();
@@ -1085,6 +1220,8 @@ void Dx11Renderer::releaseSceneResources() {
     m_renderAssets.objectPass.pixelShader.Reset();
     m_renderAssets.objectPass.vertexShader.Reset();
 }
+
+
 
 
 

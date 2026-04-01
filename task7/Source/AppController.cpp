@@ -30,7 +30,8 @@ void AppController::updateAndRender(float deltaTimeSeconds) {
     m_fpsAccumulatedSeconds += deltaTimeSeconds;
     ++m_fpsFrameCount;
     if (m_fpsAccumulatedSeconds >= kFpsUpdateIntervalSeconds) {
-        m_lastPublishedFps = static_cast<std::uint32_t>(static_cast<float>(m_fpsFrameCount) / m_fpsAccumulatedSeconds + 0.5f);
+        m_lastPublishedFps =
+            static_cast<std::uint32_t>(static_cast<float>(m_fpsFrameCount) / m_fpsAccumulatedSeconds + 0.5f);
         m_fpsAccumulatedSeconds = 0.0f;
         m_fpsFrameCount = 0u;
         updateWindowTitle();
@@ -93,8 +94,9 @@ void AppController::updateWindowTitle() {
         return;
     }
 
-    wchar_t title[128]{};
-    swprintf_s(title, L"%s | FPS: %u", kBaseWindowTitle, m_lastPublishedFps);
+    wchar_t title[160]{};
+    swprintf_s(title, L"%s | FPS: %u | Mode: %s", kBaseWindowTitle, m_lastPublishedFps,
+               m_renderer.postProcessModeName());
     SetWindowTextW(m_window, title);
 }
 
@@ -131,6 +133,12 @@ LRESULT AppController::handleKeyDown(HWND window, UINT message, WPARAM wParam, L
         case VK_SPACE:
             if ((lParam & (1 << 30)) == 0) {
                 m_renderer.toggleSceneAutoRotation();
+            }
+            return 0;
+        case 'P':
+            if ((lParam & (1 << 30)) == 0) {
+                m_renderer.cyclePostProcessMode();
+                updateWindowTitle();
             }
             return 0;
         default:
@@ -185,4 +193,3 @@ void AppController::endMouseDrag() {
         ReleaseCapture();
     }
 }
-

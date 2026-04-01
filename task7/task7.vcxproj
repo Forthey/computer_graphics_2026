@@ -174,9 +174,12 @@
     <None Include="Shaders\skybox_vs.hlsl" />
     <None Include="Shaders\triangle_ps.hlsl" />
     <None Include="Shaders\triangle_vs.hlsl" />
+    <None Include="Shaders\postprocess_ps.hlsl" />
+    <None Include="Shaders\postprocess_vs.hlsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
 </Project>
+
 

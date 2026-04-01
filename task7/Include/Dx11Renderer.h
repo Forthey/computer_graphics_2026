@@ -25,6 +25,12 @@ class RenderItem;
 
 class Dx11Renderer {
 public:
+    enum class PostProcessMode : std::uint32_t {
+        Original = 0u,
+        Grayscale = 1u,
+        Sepia = 2u,
+    };
+
     Dx11Renderer() = default;
     ~Dx11Renderer();
 
@@ -37,6 +43,8 @@ public:
     void adjustCamera(float deltaDirection, float deltaTilt);
     void moveCamera(float forwardDelta, float rightDelta);
     void toggleSceneAutoRotation();
+    void cyclePostProcessMode();
+    const wchar_t* postProcessModeName() const;
     void shutdown();
 
 private:
@@ -56,19 +64,23 @@ private:
 
         ShaderPass objectPass;
         ShaderPass skyboxPass;
+        ShaderPass postProcessPass;
         TextureBinding cubeTexture;
         TextureBinding cubeNormalTexture;
         TextureBinding skyboxTexture;
+        TextureBinding postProcessTexture;
         ComPtr<ID3D11RasterizerState> rasterizerState;
         ComPtr<ID3D11BlendState> transparentBlendState;
         ComPtr<ID3D11DepthStencilState> transparentDepthState;
         ComPtr<ID3D11Buffer> objectBuffer;
         ComPtr<ID3D11Buffer> sceneBuffer;
         ComPtr<ID3D11Buffer> opaqueInstanceBuffer;
+        ComPtr<ID3D11Buffer> postProcessBuffer;
     };
 
     bool createBackBufferTarget();
     bool createDepthResources();
+    bool createSceneColorResources();
     bool createPipelineResources();
     bool createTextureResources();
     bool buildScene();
@@ -79,6 +91,7 @@ private:
     ComPtr<ID3D11DeviceContext> m_context;
     ComPtr<IDXGISwapChain> m_swapChain;
     ComPtr<ID3D11RenderTargetView> m_backBufferTarget;
+    ComPtr<ID3D11RenderTargetView> m_sceneColorTarget;
     ComPtr<ID3D11Texture2D> m_depthBuffer;
     ComPtr<ID3D11DepthStencilView> m_depthTarget;
     RenderAssets m_renderAssets;
@@ -90,4 +103,7 @@ private:
     bool m_hasLastFrameTime = false;
     std::uint32_t m_width = 0;
     std::uint32_t m_height = 0;
+    PostProcessMode m_postProcessMode = PostProcessMode::Sepia;
 };
+
+

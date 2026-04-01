@@ -3,6 +3,13 @@ struct PointLight {
     float4 color;
 };
 
+struct OpaqueInstanceData {
+    row_major float4x4 modelMatrix;
+    row_major float4x4 normalMatrix;
+    float4 colorTint;
+    float4 materialParams;
+};
+
 cbuffer ObjectBuffer : register(b0) {
     row_major float4x4 modelMatrix;
     row_major float4x4 normalMatrix;
@@ -18,6 +25,10 @@ cbuffer SceneBuffer : register(b1) {
     float4 ambientColor;
 };
 
+cbuffer OpaqueInstanceBuffer : register(b2) {
+    OpaqueInstanceData opaqueInstances[64];
+};
+
 Texture2D colorTexture : register(t0);
 Texture2D normalMapTexture : register(t1);
 SamplerState colorSampler : register(s0);
@@ -28,9 +39,18 @@ struct PSInput {
     float3 worldTangent : TEXCOORD1;
     float3 worldNormal : TEXCOORD2;
     float2 uv : TEXCOORD3;
+    nointerpolation uint instanceId : TEXCOORD4;
 };
 
-float3 computePointLight(float3 albedo, float3 normal, float3 worldPosition) {
+float4 getColorTint(PSInput input) {
+    return materialParams.w > 0.5f ? opaqueInstances[input.instanceId].colorTint : colorTint;
+}
+
+float4 getMaterialParams(PSInput input) {
+    return materialParams.w > 0.5f ? opaqueInstances[input.instanceId].materialParams : materialParams;
+}
+
+float3 computePointLight(float3 albedo, float3 normal, float3 worldPosition, float shininess) {
     float3 litColor = ambientColor.xyz * albedo;
     const float3 viewDirection = normalize(cameraPosition.xyz - worldPosition);
 
@@ -44,8 +64,7 @@ float3 computePointLight(float3 albedo, float3 normal, float3 worldPosition) {
         const float attenuation = 1.0f / lightDistanceSquared;
         const float diffuseFactor = max(dot(lightVector, normal), 0.0f);
         const float3 reflectedLight = reflect(-lightVector, normal);
-        const float specularFactor =
-            materialParams.x > 0.0f ? pow(max(dot(viewDirection, reflectedLight), 0.0f), materialParams.x) : 0.0f;
+        const float specularFactor = shininess > 0.0f ? pow(max(dot(viewDirection, reflectedLight), 0.0f), shininess) : 0.0f;
 
         litColor += albedo * diffuseFactor * attenuation * lights[lightIndex].color.xyz;
         litColor += albedo * specularFactor * attenuation * lights[lightIndex].color.xyz;
@@ -54,9 +73,9 @@ float3 computePointLight(float3 albedo, float3 normal, float3 worldPosition) {
     return litColor;
 }
 
-float3 sampleWorldNormal(PSInput input) {
+float3 sampleWorldNormal(PSInput input, float4 activeMaterialParams) {
     const float3 normal = normalize(input.worldNormal);
-    if (materialParams.y < 0.5f) {
+    if (activeMaterialParams.y < 0.5f) {
         return normal;
     }
 
@@ -67,9 +86,11 @@ float3 sampleWorldNormal(PSInput input) {
 }
 
 float4 main(PSInput input) : SV_TARGET {
+    const float4 activeColorTint = getColorTint(input);
+    const float4 activeMaterialParams = getMaterialParams(input);
     const float4 texel = colorTexture.Sample(colorSampler, input.uv);
-    const float4 baseColor = texel * colorTint;
-    const float3 normal = sampleWorldNormal(input);
-    const float3 finalColor = computePointLight(baseColor.xyz, normal, input.worldPosition);
+    const float4 baseColor = texel * activeColorTint;
+    const float3 normal = sampleWorldNormal(input, activeMaterialParams);
+    const float3 finalColor = computePointLight(baseColor.xyz, normal, input.worldPosition, activeMaterialParams.x);
     return float4(finalColor, baseColor.w);
 }

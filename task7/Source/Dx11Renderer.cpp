@@ -30,6 +30,7 @@ namespace {
 constexpr std::uint32_t kSwapChainBufferCount = 2;
 constexpr std::uint32_t kSampleCount = 1;
 constexpr std::uint32_t kMaxPointLights = 10;
+constexpr std::uint32_t kMaxOpaqueInstances = 64;
 constexpr float kClearColor[4] = {0.02f, 0.04f, 0.08f, 1.0f};
 constexpr float kViewportMinDepth = 0.0f;
 constexpr float kViewportMaxDepth = 1.0f;
@@ -53,6 +54,13 @@ struct SceneBuffer {
     DirectX::XMUINT4 lightCount;
     PointLight lights[kMaxPointLights];
     DirectX::XMFLOAT4 ambientColor;
+};
+
+struct OpaqueInstanceData {
+    DirectX::XMFLOAT4X4 modelMatrix;
+    DirectX::XMFLOAT4X4 normalMatrix;
+    DirectX::XMFLOAT4 colorTint;
+    DirectX::XMFLOAT4 materialParams;
 };
 
 DirectX::XMMATRIX buildNormalMatrix(const DirectX::XMMATRIX& modelMatrix) {
@@ -400,14 +408,13 @@ void Dx11Renderer::renderFrame() {
         m_context->Unmap(m_renderAssets.sceneBuffer.Get(), 0);
     }
 
-    ID3D11Buffer* constantBuffers[] = {m_renderAssets.objectBuffer.Get(), m_renderAssets.sceneBuffer.Get()};
-    m_context->VSSetConstantBuffers(0, 2, constantBuffers);
-    m_context->PSSetConstantBuffers(0, 2, constantBuffers);
+    ID3D11Buffer* constantBuffers[] = {m_renderAssets.objectBuffer.Get(), m_renderAssets.sceneBuffer.Get(),
+                                     m_renderAssets.opaqueInstanceBuffer.Get()};
+    m_context->VSSetConstantBuffers(0, 3, constantBuffers);
+    m_context->PSSetConstantBuffers(0, 3, constantBuffers);
 
-    std::vector<const RenderItem*> opaqueItems;
     std::vector<const RenderItem*> transparentItems;
     std::vector<const RenderItem*> skyboxItems;
-    opaqueItems.reserve(m_renderItems.size());
     transparentItems.reserve(m_renderItems.size());
     skyboxItems.reserve(1);
 
@@ -430,7 +437,6 @@ void Dx11Renderer::renderFrame() {
                 break;
             case RenderItemType::OpaqueTextured:
             default:
-                opaqueItems.push_back(renderItem.get());
                 break;
         }
     }
@@ -509,10 +515,57 @@ void Dx11Renderer::renderFrame() {
         m_context->DrawIndexed(mesh->indexCount(), 0, 0);
     };
 
-    for (const RenderItem* renderItem : opaqueItems) {
-        drawItem(renderItem);
-    }
+    if (!m_opaqueCubeItems.empty()) {
+        const std::uint32_t opaqueInstanceCount =
+            static_cast<std::uint32_t>((std::min)(m_opaqueCubeItems.size(), static_cast<std::size_t>(kMaxOpaqueInstances)));
+        const std::shared_ptr<Mesh>& opaqueMesh = m_opaqueCubeItems.front()->mesh();
+        if (opaqueInstanceCount > 0u && opaqueMesh && opaqueMesh->isValid()) {
+            D3D11_MAPPED_SUBRESOURCE instanceMap{};
+            const HRESULT instanceMapResult =
+                m_context->Map(m_renderAssets.opaqueInstanceBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &instanceMap);
+            assert(SUCCEEDED(instanceMapResult));
+            if (SUCCEEDED(instanceMapResult)) {
+                auto* instanceBuffer = reinterpret_cast<OpaqueInstanceData*>(instanceMap.pData);
+                for (std::uint32_t instanceIndex = 0; instanceIndex < opaqueInstanceCount; ++instanceIndex) {
+                    const CubeRenderItem& renderItem = *m_opaqueCubeItems[instanceIndex];
+                    const DirectX::XMMATRIX modelMatrix = renderItem.buildModelMatrix();
+                    DirectX::XMStoreFloat4x4(&instanceBuffer[instanceIndex].modelMatrix, modelMatrix);
+                    DirectX::XMStoreFloat4x4(&instanceBuffer[instanceIndex].normalMatrix, buildNormalMatrix(modelMatrix));
+                    instanceBuffer[instanceIndex].colorTint = renderItem.colorTint();
+                    instanceBuffer[instanceIndex].materialParams = DirectX::XMFLOAT4{
+                        renderItem.shininess(), renderItem.useNormalMap() ? 1.0f : 0.0f,
+                        static_cast<float>(renderItem.textureIndex()), 0.0f};
+                }
+                m_context->Unmap(m_renderAssets.opaqueInstanceBuffer.Get(), 0);
+            }
 
+            ObjectBuffer opaqueObjectBuffer{};
+            DirectX::XMStoreFloat4x4(&opaqueObjectBuffer.modelMatrix, DirectX::XMMatrixIdentity());
+            DirectX::XMStoreFloat4x4(&opaqueObjectBuffer.normalMatrix, DirectX::XMMatrixIdentity());
+            opaqueObjectBuffer.colorTint = DirectX::XMFLOAT4{1.0f, 1.0f, 1.0f, 1.0f};
+            opaqueObjectBuffer.materialParams = DirectX::XMFLOAT4{0.0f, 0.0f, 0.0f, 1.0f};
+            m_context->UpdateSubresource(m_renderAssets.objectBuffer.Get(), 0, nullptr, &opaqueObjectBuffer, 0, 0);
+
+            m_context->OMSetBlendState(nullptr, nullptr, 0xFFFFFFFF);
+            m_context->OMSetDepthStencilState(nullptr, 0);
+            m_context->IASetInputLayout(m_renderAssets.objectPass.inputLayout.Get());
+            m_context->VSSetShader(m_renderAssets.objectPass.vertexShader.Get(), nullptr, 0);
+            m_context->PSSetShader(m_renderAssets.objectPass.pixelShader.Get(), nullptr, 0);
+
+            ID3D11SamplerState* samplers[] = {m_renderAssets.cubeTexture.samplerState.Get()};
+            ID3D11ShaderResourceView* textureViews[] = {m_renderAssets.cubeTexture.textureView.Get(),
+                                                        m_renderAssets.cubeNormalTexture.textureView.Get()};
+            m_context->PSSetSamplers(0, 1, samplers);
+            m_context->PSSetShaderResources(0, 2, textureViews);
+
+            const std::uint32_t vertexStride = opaqueMesh->vertexStride();
+            constexpr std::uint32_t startOffset = 0;
+            ID3D11Buffer* geometry[] = {opaqueMesh->vertexBuffer()};
+            m_context->IASetVertexBuffers(0, 1, geometry, &vertexStride, &startOffset);
+            m_context->IASetIndexBuffer(opaqueMesh->indexBuffer(), opaqueMesh->indexFormat(), 0);
+            m_context->DrawIndexedInstanced(opaqueMesh->indexCount(), opaqueInstanceCount, 0, 0, 0);
+        }
+    }
     for (const RenderItem* renderItem : skyboxItems) {
         drawItem(renderItem);
     }
@@ -762,6 +815,17 @@ bool Dx11Renderer::createPipelineResources() {
         return false;
     }
 
+    D3D11_BUFFER_DESC opaqueInstanceBufferDesc{};
+    opaqueInstanceBufferDesc.ByteWidth = static_cast<unsigned int>(sizeof(OpaqueInstanceData) * kMaxOpaqueInstances);
+    opaqueInstanceBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+    opaqueInstanceBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+    opaqueInstanceBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+    result = m_device->CreateBuffer(&opaqueInstanceBufferDesc, nullptr, m_renderAssets.opaqueInstanceBuffer.GetAddressOf());
+    if (FAILED(result)) {
+        return false;
+    }
+
     D3D11_SAMPLER_DESC wrapSamplerDesc{};
     wrapSamplerDesc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
     wrapSamplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
@@ -930,6 +994,7 @@ void Dx11Renderer::releaseSceneResources() {
     m_renderAssets.cubeTexture.samplerState.Reset();
     m_renderAssets.sceneBuffer.Reset();
     m_renderAssets.objectBuffer.Reset();
+    m_renderAssets.opaqueInstanceBuffer.Reset();
     m_renderAssets.transparentDepthState.Reset();
     m_renderAssets.transparentBlendState.Reset();
     m_renderAssets.skyboxPass.depthStencilState.Reset();

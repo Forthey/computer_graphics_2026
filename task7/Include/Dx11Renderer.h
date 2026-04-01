@@ -64,6 +64,7 @@ private:
         ComPtr<ID3D11DepthStencilState> transparentDepthState;
         ComPtr<ID3D11Buffer> objectBuffer;
         ComPtr<ID3D11Buffer> sceneBuffer;
+        ComPtr<ID3D11Buffer> opaqueInstanceBuffer;
     };
 
     bool createBackBufferTarget();

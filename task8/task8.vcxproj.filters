@@ -97,6 +97,9 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <None Include="Shaders\cull_cs.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
     <None Include="Shaders\skybox_ps.hlsl">
       <Filter>Shaders</Filter>
     </None>

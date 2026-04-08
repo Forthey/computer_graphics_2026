@@ -23,11 +23,14 @@ cbuffer SceneBuffer : register(b1) {
     uint4 lightCount;
     PointLight lights[10];
     float4 ambientColor;
+    float4 frustum[6];
 };
 
 cbuffer OpaqueInstanceBuffer : register(b2) {
     OpaqueInstanceData opaqueInstances[64];
 };
+
+StructuredBuffer<uint> visibleObjectIds : register(t0);
 
 struct VSInput {
     float3 position : POSITION;
@@ -49,8 +52,9 @@ struct VSOutput {
 VSOutput main(VSInput input) {
     VSOutput output;
     const bool useInstancing = materialParams.w > 0.5f;
-    const row_major float4x4 activeModelMatrix = useInstancing ? opaqueInstances[input.instanceId].modelMatrix : modelMatrix;
-    const row_major float4x4 activeNormalMatrix = useInstancing ? opaqueInstances[input.instanceId].normalMatrix : normalMatrix;
+    const uint objectId = useInstancing ? visibleObjectIds[input.instanceId] : 0u;
+    const row_major float4x4 activeModelMatrix = useInstancing ? opaqueInstances[objectId].modelMatrix : modelMatrix;
+    const row_major float4x4 activeNormalMatrix = useInstancing ? opaqueInstances[objectId].normalMatrix : normalMatrix;
 
     const float4 worldPosition = mul(float4(input.position, 1.0f), activeModelMatrix);
     output.position = mul(worldPosition, viewProjectionMatrix);
@@ -58,6 +62,6 @@ VSOutput main(VSInput input) {
     output.worldTangent = mul(float4(input.tangent, 0.0f), activeNormalMatrix).xyz;
     output.worldNormal = mul(float4(input.normal, 0.0f), activeNormalMatrix).xyz;
     output.uv = input.uv;
-    output.instanceId = input.instanceId;
+    output.instanceId = useInstancing ? objectId : input.instanceId;
     return output;
 }

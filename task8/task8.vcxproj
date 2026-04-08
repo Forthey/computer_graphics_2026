@@ -170,6 +170,7 @@
     <ClCompile Include="Source\TextureLoader.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Shaders\cull_cs.hlsl" />
     <None Include="Shaders\skybox_ps.hlsl" />
     <None Include="Shaders\skybox_vs.hlsl" />
     <None Include="Shaders\triangle_ps.hlsl" />

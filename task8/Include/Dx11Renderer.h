@@ -10,6 +10,7 @@
 #pragma warning(pop)
 #endif
 
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -25,6 +26,8 @@ class RenderItem;
 
 class Dx11Renderer {
 public:
+    static constexpr std::size_t kPipelineQueryCount = 10u;
+
     enum class PostProcessMode : std::uint32_t {
         Original = 0u,
         Grayscale = 1u,
@@ -44,6 +47,7 @@ public:
     void moveCamera(float forwardDelta, float rightDelta);
     void toggleSceneAutoRotation();
     void cyclePostProcessMode();
+    std::uint32_t gpuVisibleInstanceCount() const;
     const wchar_t* postProcessModeName() const;
     void shutdown();
 
@@ -75,7 +79,15 @@ private:
         ComPtr<ID3D11Buffer> objectBuffer;
         ComPtr<ID3D11Buffer> sceneBuffer;
         ComPtr<ID3D11Buffer> opaqueInstanceBuffer;
+        ComPtr<ID3D11Buffer> cullParamsBuffer;
         ComPtr<ID3D11Buffer> postProcessBuffer;
+        ComPtr<ID3D11Buffer> visibleInstanceIdsBuffer;
+        ComPtr<ID3D11ShaderResourceView> visibleInstanceIdsView;
+        ComPtr<ID3D11UnorderedAccessView> visibleInstanceIdsUav;
+        ComPtr<ID3D11Buffer> indirectArgsSrcBuffer;
+        ComPtr<ID3D11UnorderedAccessView> indirectArgsUav;
+        ComPtr<ID3D11Buffer> indirectArgsBuffer;
+        ComPtr<ID3D11ComputeShader> cullShader;
     };
 
     bool createBackBufferTarget();
@@ -84,6 +96,7 @@ private:
     bool createPipelineResources();
     bool createTextureResources();
     bool buildScene();
+    void readPipelineQueries();
     void releaseRenderTargets();
     void releaseSceneResources();
 
@@ -104,6 +117,10 @@ private:
     std::uint32_t m_width = 0;
     std::uint32_t m_height = 0;
     PostProcessMode m_postProcessMode = PostProcessMode::Sepia;
+    std::array<ComPtr<ID3D11Query>, kPipelineQueryCount> m_pipelineQueries;
+    std::uint32_t m_submittedQueryCount = 0u;
+    std::uint32_t m_completedQueryCount = 0u;
+    std::uint32_t m_gpuVisibleInstances = 0u;
 };
 
 

@@ -95,8 +95,8 @@ void AppController::updateWindowTitle() {
     }
 
     wchar_t title[160]{};
-    swprintf_s(title, L"%s | FPS: %u | Mode: %s", kBaseWindowTitle, m_lastPublishedFps,
-               m_renderer.postProcessModeName());
+    swprintf_s(title, L"%s | FPS: %u | GPU visible: %u | Mode: %s", kBaseWindowTitle, m_lastPublishedFps,
+               m_renderer.gpuVisibleInstanceCount(), m_renderer.postProcessModeName());
     SetWindowTextW(m_window, title);
 }
 

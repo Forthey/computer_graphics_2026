@@ -23,6 +23,7 @@ cbuffer SceneBuffer : register(b1) {
     uint4 lightCount;
     PointLight lights[10];
     float4 ambientColor;
+    float4 frustum[6];
 };
 
 cbuffer OpaqueInstanceBuffer : register(b2) {

@@ -3,9 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-void Camera::adjustAngles(float deltaDirection, float deltaTilt) {
-    rotate(deltaDirection, deltaTilt);
-}
+void Camera::adjustAngles(float deltaDirection, float deltaTilt) { rotate(deltaDirection, deltaTilt); }
 
 void Camera::rotate(float deltaDirectionRadians, float deltaTiltRadians) {
     m_direction += deltaDirectionRadians;
@@ -26,9 +24,7 @@ DirectX::XMMATRIX Camera::buildProjectionMatrix(float aspectRatio) const {
 
 DirectX::XMFLOAT3 Camera::position() const { return DirectX::XMFLOAT3{m_positionX, m_positionY, m_positionZ}; }
 
-void Camera::moveLocal(float forwardDelta, float rightDelta) {
-    move(forwardDelta, rightDelta, 0.0f);
-}
+void Camera::moveLocal(float forwardDelta, float rightDelta) { move(forwardDelta, rightDelta, 0.0f); }
 
 void Camera::move(float forwardDelta, float rightDelta, float upDelta) {
     const DirectX::XMVECTOR forward = forwardVector();

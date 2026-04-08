@@ -85,7 +85,8 @@ DirectX::XMMATRIX buildNormalMatrix(const DirectX::XMMATRIX& modelMatrix) {
     return DirectX::XMMatrixTranspose(DirectX::XMMatrixInverse(nullptr, modelMatrix));
 }
 
-DirectX::BoundingFrustum buildWorldFrustum(const DirectX::XMMATRIX& viewMatrix, const DirectX::XMMATRIX& projectionMatrix) {
+DirectX::BoundingFrustum buildWorldFrustum(const DirectX::XMMATRIX& viewMatrix,
+                                           const DirectX::XMMATRIX& projectionMatrix) {
     DirectX::BoundingFrustum viewFrustum;
     DirectX::BoundingFrustum::CreateFromMatrix(viewFrustum, projectionMatrix);
 
@@ -99,7 +100,8 @@ void fillSceneLighting(SceneBuffer& sceneBuffer) {
     sceneBuffer.ambientColor = DirectX::XMFLOAT4{0.07f, 0.07f, 0.09f, 1.0f};
     sceneBuffer.lights[0] = {DirectX::XMFLOAT4{-4.8f, 1.25f, 3.9f, 1.0f}, DirectX::XMFLOAT4{1.0f, 0.90f, 0.82f, 1.0f}};
     sceneBuffer.lights[1] = {DirectX::XMFLOAT4{4.8f, 1.25f, 3.9f, 1.0f}, DirectX::XMFLOAT4{0.82f, 0.90f, 1.0f, 1.0f}};
-    sceneBuffer.lights[2] = {DirectX::XMFLOAT4{-4.8f, 1.25f, 11.75f, 1.0f}, DirectX::XMFLOAT4{0.88f, 1.0f, 0.84f, 1.0f}};
+    sceneBuffer.lights[2] = {DirectX::XMFLOAT4{-4.8f, 1.25f, 11.75f, 1.0f},
+                             DirectX::XMFLOAT4{0.88f, 1.0f, 0.84f, 1.0f}};
     sceneBuffer.lights[3] = {DirectX::XMFLOAT4{4.8f, 1.25f, 11.75f, 1.0f}, DirectX::XMFLOAT4{1.0f, 0.82f, 0.90f, 1.0f}};
     sceneBuffer.lights[4] = {DirectX::XMFLOAT4{0.0f, 1.85f, 8.9f, 1.0f}, DirectX::XMFLOAT4{1.0f, 0.98f, 0.84f, 1.0f}};
 
@@ -210,7 +212,6 @@ bool createTexture2DResource(ID3D11Device* device, const TextureDescription& tex
     return SUCCEEDED(result);
 }
 
-
 bool createTexture2DArrayResource(ID3D11Device* device, const std::vector<TextureDescription>& textureDescriptions,
                                   ComPtr<ID3D11Texture2D>& texture, ComPtr<ID3D11ShaderResourceView>& textureView) {
     if (device == nullptr || textureDescriptions.empty()) {
@@ -233,7 +234,8 @@ bool createTexture2DArrayResource(ID3D11Device* device, const std::vector<Textur
 
     for (const TextureDescription& textureDescription : textureDescriptions) {
         if (textureDescription.fmt != reference.fmt || textureDescription.width != reference.width ||
-            textureDescription.height != reference.height || textureDescription.mipmapsCount != reference.mipmapsCount ||
+            textureDescription.height != reference.height ||
+            textureDescription.mipmapsCount != reference.mipmapsCount ||
             textureDescription.subresources.size() != reference.mipmapsCount || textureDescription.data.empty()) {
             return false;
         }
@@ -309,8 +311,7 @@ bool createCubemapResource(ID3D11Device* device, const std::array<TextureDescrip
     const std::uint32_t width = faceTextures[0].width;
     const std::uint32_t height = faceTextures[0].height;
     const std::uint32_t mipmapsCount = faceTextures[0].mipmapsCount;
-    if (width == 0u || height == 0u || mipmapsCount == 0u ||
-        faceTextures[0].subresources.size() != mipmapsCount) {
+    if (width == 0u || height == 0u || mipmapsCount == 0u || faceTextures[0].subresources.size() != mipmapsCount) {
         return false;
     }
 
@@ -339,8 +340,8 @@ bool createCubemapResource(ID3D11Device* device, const std::array<TextureDescrip
     for (std::size_t faceIndex = 0; faceIndex < faceTextures.size(); ++faceIndex) {
         for (std::uint32_t mipIndex = 0; mipIndex < mipmapsCount; ++mipIndex) {
             const TextureSubresourceLayout& layout = faceTextures[faceIndex].subresources[mipIndex];
-            const std::size_t subresourceIndex = static_cast<std::size_t>(D3D11CalcSubresource(
-                mipIndex, static_cast<UINT>(faceIndex), mipmapsCount));
+            const std::size_t subresourceIndex =
+                static_cast<std::size_t>(D3D11CalcSubresource(mipIndex, static_cast<UINT>(faceIndex), mipmapsCount));
             subresources[subresourceIndex].pSysMem = faceTextures[faceIndex].data.data() + layout.dataOffset;
             subresources[subresourceIndex].SysMemPitch = layout.rowPitch;
             subresources[subresourceIndex].SysMemSlicePitch = layout.slicePitch;
@@ -370,7 +371,8 @@ bool createCubemapResource(ID3D11Device* device, const std::array<TextureDescrip
     viewDesc.TextureCube.MostDetailedMip = 0;
     result = device->CreateShaderResourceView(cubemapTexture.Get(), &viewDesc, cubemapView.ReleaseAndGetAddressOf());
     return SUCCEEDED(result);
-}}  // namespace
+}
+}  // namespace
 
 Dx11Renderer::~Dx11Renderer() { shutdown(); }
 
@@ -447,7 +449,8 @@ bool Dx11Renderer::initialize(HWND window) {
         return false;
     }
 
-    if (!createBackBufferTarget() || !createDepthResources() || !createSceneColorResources() || !createPipelineResources() || !buildScene()) {
+    if (!createBackBufferTarget() || !createDepthResources() || !createSceneColorResources() ||
+        !createPipelineResources() || !buildScene()) {
         shutdown();
         return false;
     }
@@ -638,8 +641,8 @@ void Dx11Renderer::renderFrame() {
     };
 
     if (!m_opaqueCubeItems.empty()) {
-        const std::uint32_t opaqueInstanceCount =
-            static_cast<std::uint32_t>((std::min)(m_opaqueCubeItems.size(), static_cast<std::size_t>(kMaxOpaqueInstances)));
+        const std::uint32_t opaqueInstanceCount = static_cast<std::uint32_t>(
+            (std::min)(m_opaqueCubeItems.size(), static_cast<std::size_t>(kMaxOpaqueInstances)));
         const std::shared_ptr<Mesh>& opaqueMesh = m_opaqueCubeItems.front()->mesh();
         if (opaqueMesh && opaqueMesh->isValid()) {
             D3D11_MAPPED_SUBRESOURCE instanceMap{};
@@ -652,11 +655,12 @@ void Dx11Renderer::renderFrame() {
                     const CubeRenderItem& renderItem = *m_opaqueCubeItems[instanceIndex];
                     const DirectX::XMMATRIX modelMatrix = renderItem.buildModelMatrix();
                     DirectX::XMStoreFloat4x4(&instanceBuffer[instanceIndex].modelMatrix, modelMatrix);
-                    DirectX::XMStoreFloat4x4(&instanceBuffer[instanceIndex].normalMatrix, buildNormalMatrix(modelMatrix));
+                    DirectX::XMStoreFloat4x4(&instanceBuffer[instanceIndex].normalMatrix,
+                                             buildNormalMatrix(modelMatrix));
                     instanceBuffer[instanceIndex].colorTint = renderItem.colorTint();
-                    instanceBuffer[instanceIndex].materialParams = DirectX::XMFLOAT4{
-                        renderItem.shininess(), renderItem.useNormalMap() ? 1.0f : 0.0f,
-                        static_cast<float>(renderItem.textureIndex()), 0.0f};
+                    instanceBuffer[instanceIndex].materialParams =
+                        DirectX::XMFLOAT4{renderItem.shininess(), renderItem.useNormalMap() ? 1.0f : 0.0f,
+                                          static_cast<float>(renderItem.textureIndex()), 0.0f};
                 }
                 m_context->Unmap(m_renderAssets.opaqueInstanceBuffer.Get(), 0);
             }
@@ -676,14 +680,16 @@ void Dx11Renderer::renderFrame() {
             indirectArgs.StartInstanceLocation = 0u;
             m_context->UpdateSubresource(m_renderAssets.indirectArgsSrcBuffer.Get(), 0, nullptr, &indirectArgs, 0, 0);
 
-            ID3D11Buffer* computeConstantBuffers[] = {m_renderAssets.sceneBuffer.Get(), m_renderAssets.cullParamsBuffer.Get()};
+            ID3D11Buffer* computeConstantBuffers[] = {m_renderAssets.sceneBuffer.Get(),
+                                                      m_renderAssets.cullParamsBuffer.Get()};
             m_context->CSSetConstantBuffers(0, 2, computeConstantBuffers);
             ID3D11UnorderedAccessView* computeUavs[] = {m_renderAssets.indirectArgsUav.Get(),
                                                         m_renderAssets.visibleInstanceIdsUav.Get()};
             m_context->CSSetUnorderedAccessViews(0, 2, computeUavs, nullptr);
             m_context->CSSetShader(m_renderAssets.cullShader.Get(), nullptr, 0);
             m_context->Dispatch(divideRoundUp(opaqueInstanceCount, kComputeCullThreadGroupSize), 1, 1);
-            m_context->CopyResource(m_renderAssets.indirectArgsBuffer.Get(), m_renderAssets.indirectArgsSrcBuffer.Get());
+            m_context->CopyResource(m_renderAssets.indirectArgsBuffer.Get(),
+                                    m_renderAssets.indirectArgsSrcBuffer.Get());
 
             ID3D11UnorderedAccessView* nullComputeUavs[] = {nullptr, nullptr};
             ID3D11Buffer* nullComputeConstantBuffers[] = {nullptr, nullptr};
@@ -910,7 +916,8 @@ bool Dx11Renderer::createSceneColorResources() {
     colorDesc.Usage = D3D11_USAGE_DEFAULT;
     colorDesc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 
-    HRESULT result = m_device->CreateTexture2D(&colorDesc, nullptr, m_renderAssets.postProcessTexture.texture.GetAddressOf());
+    HRESULT result =
+        m_device->CreateTexture2D(&colorDesc, nullptr, m_renderAssets.postProcessTexture.texture.GetAddressOf());
     if (FAILED(result)) {
         return false;
     }
@@ -999,21 +1006,22 @@ bool Dx11Renderer::createPipelineResources() {
         return false;
     }
 
-    result = m_device->CreateVertexShader(postProcessVertexCode->GetBufferPointer(),
-                                          postProcessVertexCode->GetBufferSize(), nullptr,
-                                          m_renderAssets.postProcessPass.vertexShader.GetAddressOf());
+    result =
+        m_device->CreateVertexShader(postProcessVertexCode->GetBufferPointer(), postProcessVertexCode->GetBufferSize(),
+                                     nullptr, m_renderAssets.postProcessPass.vertexShader.GetAddressOf());
     if (FAILED(result)) {
         return false;
     }
 
-    result = m_device->CreatePixelShader(postProcessPixelCode->GetBufferPointer(), postProcessPixelCode->GetBufferSize(),
-                                         nullptr, m_renderAssets.postProcessPass.pixelShader.GetAddressOf());
+    result =
+        m_device->CreatePixelShader(postProcessPixelCode->GetBufferPointer(), postProcessPixelCode->GetBufferSize(),
+                                    nullptr, m_renderAssets.postProcessPass.pixelShader.GetAddressOf());
     if (FAILED(result)) {
         return false;
     }
 
-    result = m_device->CreateComputeShader(cullComputeCode->GetBufferPointer(), cullComputeCode->GetBufferSize(), nullptr,
-                                           m_renderAssets.cullShader.GetAddressOf());
+    result = m_device->CreateComputeShader(cullComputeCode->GetBufferPointer(), cullComputeCode->GetBufferSize(),
+                                           nullptr, m_renderAssets.cullShader.GetAddressOf());
     if (FAILED(result)) {
         return false;
     }
@@ -1056,7 +1064,8 @@ bool Dx11Renderer::createPipelineResources() {
     skyboxDepthDesc.DepthEnable = TRUE;
     skyboxDepthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
     skyboxDepthDesc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
-    result = m_device->CreateDepthStencilState(&skyboxDepthDesc, m_renderAssets.skyboxPass.depthStencilState.GetAddressOf());
+    result =
+        m_device->CreateDepthStencilState(&skyboxDepthDesc, m_renderAssets.skyboxPass.depthStencilState.GetAddressOf());
     if (FAILED(result)) {
         return false;
     }
@@ -1081,7 +1090,8 @@ bool Dx11Renderer::createPipelineResources() {
     transparentDepthDesc.DepthEnable = TRUE;
     transparentDepthDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
     transparentDepthDesc.DepthFunc = D3D11_COMPARISON_LESS;
-    result = m_device->CreateDepthStencilState(&transparentDepthDesc, m_renderAssets.transparentDepthState.GetAddressOf());
+    result =
+        m_device->CreateDepthStencilState(&transparentDepthDesc, m_renderAssets.transparentDepthState.GetAddressOf());
     if (FAILED(result)) {
         return false;
     }
@@ -1113,7 +1123,8 @@ bool Dx11Renderer::createPipelineResources() {
     opaqueInstanceBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
     opaqueInstanceBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-    result = m_device->CreateBuffer(&opaqueInstanceBufferDesc, nullptr, m_renderAssets.opaqueInstanceBuffer.GetAddressOf());
+    result =
+        m_device->CreateBuffer(&opaqueInstanceBufferDesc, nullptr, m_renderAssets.opaqueInstanceBuffer.GetAddressOf());
     if (FAILED(result)) {
         return false;
     }
@@ -1145,7 +1156,8 @@ bool Dx11Renderer::createPipelineResources() {
     visibleIdsBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
     visibleIdsBufferDesc.StructureByteStride = sizeof(std::uint32_t);
 
-    result = m_device->CreateBuffer(&visibleIdsBufferDesc, nullptr, m_renderAssets.visibleInstanceIdsBuffer.GetAddressOf());
+    result =
+        m_device->CreateBuffer(&visibleIdsBufferDesc, nullptr, m_renderAssets.visibleInstanceIdsBuffer.GetAddressOf());
     if (FAILED(result)) {
         return false;
     }
@@ -1169,7 +1181,8 @@ bool Dx11Renderer::createPipelineResources() {
     indirectArgsSrcBufferDesc.MiscFlags = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
     indirectArgsSrcBufferDesc.StructureByteStride = sizeof(std::uint32_t);
 
-    result = m_device->CreateBuffer(&indirectArgsSrcBufferDesc, nullptr, m_renderAssets.indirectArgsSrcBuffer.GetAddressOf());
+    result = m_device->CreateBuffer(&indirectArgsSrcBufferDesc, nullptr,
+                                    m_renderAssets.indirectArgsSrcBuffer.GetAddressOf());
     if (FAILED(result)) {
         return false;
     }
@@ -1224,7 +1237,8 @@ bool Dx11Renderer::createPipelineResources() {
         return false;
     }
 
-    result = m_device->CreateSamplerState(&clampSamplerDesc, m_renderAssets.postProcessTexture.samplerState.GetAddressOf());
+    result =
+        m_device->CreateSamplerState(&clampSamplerDesc, m_renderAssets.postProcessTexture.samplerState.GetAddressOf());
     return SUCCEEDED(result);
 }
 
@@ -1239,7 +1253,8 @@ bool Dx11Renderer::createTextureResources() {
 
     TextureDescription cubeNormalTextureDescription;
     if (loadDDS(L"Assets\\cube\\active_normal.dds", cubeNormalTextureDescription)) {
-        if (!createTexture2DResource(m_device.Get(), cubeNormalTextureDescription, m_renderAssets.cubeNormalTexture.texture,
+        if (!createTexture2DResource(m_device.Get(), cubeNormalTextureDescription,
+                                     m_renderAssets.cubeNormalTexture.texture,
                                      m_renderAssets.cubeNormalTexture.textureView)) {
             return false;
         }
@@ -1285,7 +1300,6 @@ bool Dx11Renderer::buildScene() {
     constexpr float kOpaqueCubeSpacingX = 1.9f;
     constexpr float kOpaqueCubeSpacingZ = 2.15f;
 
-
     for (int row = 0; row < kOpaqueCubeRows; ++row) {
         for (int column = 0; column < kOpaqueCubeColumns; ++column) {
             CubeRenderItem::Params opaqueParams{};
@@ -1294,13 +1308,11 @@ bool Dx11Renderer::buildScene() {
             opaqueParams.rotationOffset = static_cast<float>(row * kOpaqueCubeColumns + column) * 0.17f;
             opaqueParams.position = DirectX::XMFLOAT3{
                 (static_cast<float>(column) - static_cast<float>(kOpaqueCubeColumns - 1) * 0.5f) * kOpaqueCubeSpacingX,
-                0.0f,
-                4.6f + static_cast<float>(row) * kOpaqueCubeSpacingZ};
+                0.0f, 4.6f + static_cast<float>(row) * kOpaqueCubeSpacingZ};
             opaqueParams.useNormalMap = true;
             opaqueParams.textureIndex = static_cast<std::uint32_t>((row + column) % 2);
-            opaqueParams.colorTint = ((row + column) % 2 == 0)
-                                        ? DirectX::XMFLOAT4{1.0f, 1.0f, 1.0f, 1.0f}
-                                        : DirectX::XMFLOAT4{0.92f, 0.98f, 1.0f, 1.0f};
+            opaqueParams.colorTint = ((row + column) % 2 == 0) ? DirectX::XMFLOAT4{1.0f, 1.0f, 1.0f, 1.0f}
+                                                               : DirectX::XMFLOAT4{0.92f, 0.98f, 1.0f, 1.0f};
 
             auto opaqueCube = std::make_shared<CubeRenderItem>(m_device.Get(), opaqueParams);
             if (!opaqueCube->mesh() || !opaqueCube->mesh()->isValid()) {
@@ -1317,9 +1329,7 @@ bool Dx11Renderer::buildScene() {
     CullParamsBuffer cullParams{};
     cullParams.numShapes = DirectX::XMUINT4{
         static_cast<std::uint32_t>((std::min)(m_opaqueCubeItems.size(), static_cast<std::size_t>(kMaxOpaqueInstances))),
-        0u,
-        0u,
-        0u};
+        0u, 0u, 0u};
     for (std::uint32_t instanceIndex = 0; instanceIndex < cullParams.numShapes.x; ++instanceIndex) {
         const CubeRenderItem& renderItem = *m_opaqueCubeItems[instanceIndex];
         const DirectX::XMFLOAT3 boundsMin = renderItem.boundsMin();
@@ -1396,20 +1406,3 @@ void Dx11Renderer::releaseSceneResources() {
     m_completedQueryCount = 0u;
     m_gpuVisibleInstances = 0u;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

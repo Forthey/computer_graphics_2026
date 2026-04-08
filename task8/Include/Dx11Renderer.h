@@ -122,5 +122,3 @@ private:
     std::uint32_t m_completedQueryCount = 0u;
     std::uint32_t m_gpuVisibleInstances = 0u;
 };
-
-

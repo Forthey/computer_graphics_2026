@@ -8,7 +8,7 @@ constexpr float kKeyboardMoveSpeed = 3.0f;
 constexpr float kMouseSensitivity = 0.01f;
 constexpr float kFpsUpdateIntervalSeconds = 0.25f;
 constexpr wchar_t kBaseWindowTitle[] = L"task8 DirectX11";
-}
+}  // namespace
 
 bool AppController::initializeWindowResources(HWND window) {
     m_window = window;
@@ -181,8 +181,7 @@ void AppController::handleMouseMove(WPARAM wParam, LPARAM lParam) {
     const int mouseY = static_cast<short>(HIWORD(lParam));
     const int dx = mouseX - m_lastMousePos.x;
     const int dy = mouseY - m_lastMousePos.y;
-    m_renderer.adjustCamera(static_cast<float>(dx) * kMouseSensitivity,
-                            static_cast<float>(-dy) * kMouseSensitivity);
+    m_renderer.adjustCamera(static_cast<float>(dx) * kMouseSensitivity, static_cast<float>(-dy) * kMouseSensitivity);
     m_lastMousePos.x = mouseX;
     m_lastMousePos.y = mouseY;
 }

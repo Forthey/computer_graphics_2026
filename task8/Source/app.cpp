@@ -90,4 +90,3 @@ int runApp(HINSTANCE hInstance, int commandShowMode) {
 
     return static_cast<int>(messageData.wParam);
 }
-
